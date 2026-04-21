@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Capataz
 
-## Getting Started
+**Built with Opus 4.7 — hackathon submission.**
 
-First, run the development server:
+Capataz is a Claude-powered ambient agent that lives inside a Telegram group used by a
+construction project team in Guatemala. It ingests voice notes and receipt photos from
+foremen, reconstructs structured project state, and surfaces anomalies to the project
+manager through a bilingual (ES/EN) web dashboard.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Stack
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Next.js 16 (App Router, TypeScript, Tailwind) — _project spec called for Next 15;
+  `create-next-app@latest` now ships 16.2.x. Behavior is compatible for the skeleton._
+- Supabase (Postgres + Storage)
+- Telegram Bot API
+- Anthropic SDK, model `claude-opus-4-7`
+- Claude Managed Agents (beta header `managed-agents-2026-04-01`) — stubbed in skeleton
+- MCP server (TypeScript) — stubbed in skeleton
+- Deployed on Vercel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Phases
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **SKELETON** — every wire connected, nothing is smart. Stubs everywhere.
+- **MVP** — real transcription, vision, managed agents, MCP tools.
+- **POLISH** — UI polish, realtime, RLS, demo script.
 
-## Learn More
+We are currently in **SKELETON**.
 
-To learn more about Next.js, take a look at the following resources:
+## Skeleton sanity-check checklist
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [ ] Send a text to the bot → appears in `events` table
+- [ ] Bot replies "recibido ✓"
+- [ ] Dashboard shows the event within 5s
+- [ ] `agent_runs` row exists for the event (with stub output)
+- [ ] Send a voice note → logged with type='voice_note' and file_id stored
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT — see [LICENSE](./LICENSE).
