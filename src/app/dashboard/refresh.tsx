@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export function AutoRefresh({ intervalMs = 5000 }: { intervalMs?: number }) {
+export function AutoRefresh({ intervalMs = 2500 }: { intervalMs?: number }) {
   const router = useRouter();
   useEffect(() => {
     const id = setInterval(() => router.refresh(), intervalMs);

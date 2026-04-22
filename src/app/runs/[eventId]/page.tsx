@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import { asObject } from "@/lib/json";
+import { AutoRefresh } from "../../dashboard/refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -109,8 +110,11 @@ export default async function RunInspectorPage({
   const { event, runs, anomalies } = data;
   const payload = asObject(event.payload);
 
+  const hasRuns = runs.length > 0;
+
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 px-6 py-6">
+      {!hasRuns && <AutoRefresh intervalMs={2000} />}
       <div className="max-w-4xl mx-auto">
         <nav className="text-xs text-zinc-500 mb-4">
           <Link href={event.project_mode ? `/dashboard/${event.project_mode}` : "/dashboard"} className="hover:text-zinc-300">

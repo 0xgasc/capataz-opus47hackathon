@@ -36,6 +36,7 @@ type AnomalyRow = {
   status: string;
   agent_message: string | null;
   created_at: string;
+  event_id: string | null;
 };
 
 type BudgetRow = {
@@ -129,7 +130,7 @@ async function loadDashboard(mode: Mode) {
   `;
 
   const anomalies = await sql<AnomalyRow[]>`
-    select id, kind, severity, status, agent_message, created_at
+    select id, kind, severity, status, agent_message, created_at, event_id
     from anomalies
     where project_id = ${project.id} and status = 'open'
     order by created_at desc
@@ -141,10 +142,14 @@ async function loadDashboard(mode: Mode) {
     from project_scores
     where project_id = ${project.id}
     order by computed_at desc
-    limit 2
+    limit 12
   `;
   const score = scoreRows[0] ?? null;
   const previousScore = scoreRows[1]?.score ?? null;
+  const history = scoreRows
+    .slice()
+    .reverse()
+    .map((r) => r.score);
 
   return {
     project,
@@ -160,6 +165,7 @@ async function loadDashboard(mode: Mode) {
     anomalies,
     score,
     previousScore,
+    history,
   };
 }
 
@@ -207,8 +213,9 @@ function EventTypeBadge({ type }: { type: string }) {
 function AgentStatusBadge({ status }: { status: string | null }) {
   if (!status) {
     return (
-      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800">
-        pendiente
+      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-900 text-amber-300 border border-amber-900/40 inline-flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" aria-hidden />
+        opus procesando…
       </span>
     );
   }
@@ -248,14 +255,46 @@ function scoreColor(score: number): string {
   return "text-rose-300";
 }
 
+function ScoreSparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const width = 80;
+  const height = 22;
+  const max = 100;
+  const step = values.length > 1 ? width / (values.length - 1) : 0;
+  const points = values
+    .map((v, i) => {
+      const x = i * step;
+      const y = height - (Math.max(0, Math.min(max, v)) / max) * height;
+      return `${x},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const last = values[values.length - 1];
+  const prev = values[values.length - 2];
+  const stroke = last >= prev ? "stroke-emerald-400" : "stroke-rose-400";
+  return (
+    <svg width={width} height={height} className="mt-1.5 block">
+      <polyline
+        fill="none"
+        className={stroke}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+    </svg>
+  );
+}
+
 function ScoreCard({
   score,
   previousScore,
   label,
+  history,
 }: {
   score: ScoreRow | null;
   previousScore: number | null;
   label: string;
+  history: number[];
 }) {
   const value = score?.score ?? null;
   const components = asObject(score?.components);
@@ -290,6 +329,7 @@ function ScoreCard({
             {score.computed_by} · {formatDateTime(score.computed_at)}
           </p>
         )}
+        <ScoreSparkline values={history} />
       </div>
       <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 min-w-[260px]">
         {rows.map(([name, n]) => {
@@ -336,7 +376,7 @@ export default async function DashboardModePage({
     );
   }
 
-  const { project, budget, spent, total, pct, totalCommitted, totalMarket, driftGtq, driftPct, events, anomalies, score, previousScore } = data;
+  const { project, budget, spent, total, pct, totalCommitted, totalMarket, driftGtq, driftPct, events, anomalies, score, previousScore, history } = data;
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -363,7 +403,12 @@ export default async function DashboardModePage({
         </div>
 
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
-          <ScoreCard score={score} previousScore={previousScore} label={copy.scoreLabel} />
+          <ScoreCard
+            score={score}
+            previousScore={previousScore}
+            history={history}
+            label={copy.scoreLabel}
+          />
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-4 min-w-[260px]">
             <p className="text-[11px] uppercase tracking-wider text-zinc-500">
               {copy.valueLabel}
@@ -494,22 +539,39 @@ export default async function DashboardModePage({
             <p className="text-zinc-500 text-sm">Sin anomalías por ahora.</p>
           ) : (
             <ul className="space-y-2">
-              {anomalies.map((a) => (
-                <li
-                  key={a.id}
-                  className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-4 py-3"
-                >
-                  <div className="flex items-center gap-2 text-xs text-amber-300 flex-wrap">
-                    <SeverityChip severity={a.severity} />
-                    <span className="text-amber-500/70">·</span>
-                    <span className="truncate">{a.kind}</span>
-                    <span className="ml-auto tabular-nums">{formatDateTime(a.created_at)}</span>
-                  </div>
-                  <p className="mt-1.5 text-sm text-zinc-100 break-words">
-                    {a.agent_message ?? "—"}
-                  </p>
-                </li>
-              ))}
+              {anomalies.map((a) => {
+                const inner = (
+                  <>
+                    <div className="flex items-center gap-2 text-xs text-amber-300 flex-wrap">
+                      <SeverityChip severity={a.severity} />
+                      <span className="text-amber-500/70">·</span>
+                      <span className="truncate">{a.kind}</span>
+                      <span className="ml-auto tabular-nums">{formatDateTime(a.created_at)}</span>
+                    </div>
+                    <p className="mt-1.5 text-sm text-zinc-100 break-words">
+                      {a.agent_message ?? "—"}
+                    </p>
+                    {a.event_id && (
+                      <p className="mt-1.5 text-[10px] text-amber-500/80 uppercase tracking-wider">
+                        ver traza →
+                      </p>
+                    )}
+                  </>
+                );
+                const cls =
+                  "block rounded-lg border border-amber-900/40 bg-amber-950/20 px-4 py-3 hover:bg-amber-950/35 hover:border-amber-800/60 transition-colors";
+                return (
+                  <li key={a.id}>
+                    {a.event_id ? (
+                      <Link href={`/runs/${a.event_id}`} className={cls}>
+                        {inner}
+                      </Link>
+                    ) : (
+                      <div className={cls}>{inner}</div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
