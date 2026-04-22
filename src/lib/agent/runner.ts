@@ -18,7 +18,7 @@ import { asObject } from "@/lib/json";
 import { downloadFile } from "@/lib/telegram";
 import { transcribeSpanish } from "@/lib/transcribe";
 import { getAnthropic, OPUS_MODEL } from "./anthropic";
-import { CAPATAZ_SYSTEM_PROMPT } from "./prompt";
+import { promptForMode } from "./prompt";
 import { toolDefinitions, runTool, type ToolContext } from "./tools";
 
 export interface AgentInput {
@@ -54,15 +54,17 @@ export async function runAgentOnEvent(eventId: string): Promise<AgentOutput> {
     Array<{
       id: string;
       project_id: string | null;
+      project_mode: string | null;
       type: string;
       payload: unknown;
       created_by: string | null;
       created_at: Date | string;
     }>
   >`
-    select id, project_id, type, payload, created_by, created_at
-    from events
-    where id = ${eventId}
+    select e.id, e.project_id, p.mode as project_mode, e.type, e.payload, e.created_by, e.created_at
+    from events e
+    left join projects p on p.id = e.project_id
+    where e.id = ${eventId}
   `;
   const event = rows[0];
   if (!event) throw new Error(`event ${eventId} not found`);
@@ -76,8 +78,12 @@ export async function runAgentOnEvent(eventId: string): Promise<AgentOutput> {
     createdBy: event.created_by,
   };
 
+  const mode: "construction" | "inventory" =
+    event.project_mode === "inventory" ? "inventory" : "construction";
+
   const ctx: ToolContext = {
     projectId: event.project_id,
+    projectMode: mode,
     eventId: event.id,
     chatId: typeof payload.chat_id === "number" || typeof payload.chat_id === "string" ? payload.chat_id : null,
   };
@@ -120,7 +126,7 @@ export async function runAgentOnEvent(eventId: string): Promise<AgentOutput> {
       const resp = await anthropic.messages.create({
         model: OPUS_MODEL,
         max_tokens: 1024,
-        system: CAPATAZ_SYSTEM_PROMPT,
+        system: promptForMode(mode),
         tools: toolDefinitions as unknown as Anthropic.Tool[],
         messages,
       });

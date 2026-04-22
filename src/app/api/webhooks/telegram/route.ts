@@ -93,10 +93,14 @@ export async function POST(req: NextRequest) {
     payload = { chat_id: msg.chat.id, raw: msg };
   }
 
+  const modeParam = req.nextUrl.searchParams.get("mode");
+  const targetMode: "construction" | "inventory" =
+    modeParam === "inventory" ? "inventory" : "construction";
+
   const inserted = await sql<Array<{ id: string }>>`
     insert into events (project_id, type, payload, telegram_msg_id, created_by)
     values (
-      (select id from projects order by created_at asc limit 1),
+      (select id from projects where mode = ${targetMode} order by created_at asc limit 1),
       ${type},
       ${JSON.stringify(payload)}::jsonb,
       ${String(msg.message_id)},

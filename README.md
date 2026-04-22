@@ -87,6 +87,55 @@ After deploy, these should all pass:
 - [ ] Send a voice note → row with `type='voice_note'` and `payload.file_id` populated
 - [ ] Send a photo → row with `type='photo'` and `payload.file_id` + optional `caption`
 
+## Two modes, one substrate
+
+Capataz is the first vertical of a platform thesis: **an agent-oracle for physical
+operations.** Same schema, same agent, same substrate — flipped by
+`projects.mode`:
+
+| Mode | Lens | Top-line score |
+|---|---|---|
+| `construction` | PM watching an active site | **Project Health** |
+| `inventory` | Distributor / warehouse, collateral for a lender | **Collateral Readiness** |
+
+The dashboard lives at `/dashboard/construction` and `/dashboard/inventory`. Switch
+between them with the pill toggle in the header. Each mode has its own system prompt
+(`src/lib/agent/prompt.ts`), same tool surface, same Opus 4.7 model.
+
+The webhook also honors mode routing: `POST /api/webhooks/telegram?mode=inventory`
+drops events into the inventory project. Default (no query param) → construction.
+
+## Composite score
+
+`src/lib/scoring.ts` computes a 0–100 score from four 0–25 components:
+
+- **budget_variance** — spent / committed; 25 if under budget, 0 at 30% over.
+- **market_drift** — `(market_value − committed) / committed`; 25 if flat or positive, 0 at 20% below.
+- **anomaly_rate** — severity-weighted open anomalies (critical=15, high=7, medium=3, low=1).
+- **activity_freshness** — 25 if last event ≤12h ago, 0 at 7d+.
+
+Transparent and dumb by design — what makes the number valuable is that it's
+auditable from the `agent_runs.output` trace, not that the formula is sophisticated.
+
+## Commodity price feeds
+
+Five market feeds seeded at migration: `cemento_ugc_42_5`, `varilla_4_g40`,
+`block_pomez_15_20_40`, `arena_amarilla`, `piedrin_3_4`. Each seeded with two
+snapshots (7 days old + 1 day old) so the timeline isn't empty.
+
+Live-update prices (for demo-day market-movement scenarios) via:
+
+```bash
+curl -sS -X POST https://<your-host>/api/admin/prices \
+  -H 'content-type: application/json' \
+  -H 'x-admin-secret: <ADMIN_SECRET>' \
+  -d '{"snapshots":[{"commodity_key":"varilla_4_g40","price_gtq":172.00}]}'
+```
+
+This inserts a fresh `price_snapshots` row and caches the new price on every
+`budget_items` row linked to that feed. Next time the agent runs, `query_project_state`
+sees the new market value and the score reflects it.
+
 ## MVP agent loop
 
 On every Telegram event:
