@@ -66,16 +66,15 @@ Full deploy steps (Vercel + Telegram webhook registration): see [DEPLOY.md](./DE
 
 ```
 DATABASE_URL              Railway Postgres (use public proxy URL for Vercel)
-ANTHROPIC_API_KEY         Opus 4.7 agent — required for real runs, runner falls back to 'degraded' without it
-GROQ_API_KEY              preferred transcription (whisper-large-v3, free tier, Spanish)
-OPENAI_API_KEY            fallback transcription (whisper-1)
+ANTHROPIC_API_KEY         Opus 4.7 agent — required; runner falls back to 'degraded' without it
+GROQ_API_KEY              optional, voice-note transcription (whisper-large-v3, free tier, Spanish)
 TELEGRAM_BOT_TOKEN        from @BotFather
 TELEGRAM_WEBHOOK_SECRET   any 32+ char random string, matches Telegram header
 TELEGRAM_DEFAULT_CHAT_ID  reserved for future broadcast features
 ```
 
-If both `GROQ_API_KEY` and `OPENAI_API_KEY` are missing, voice notes still flow through the
-system — they're logged with a placeholder transcript and the agent runs on that placeholder.
+Without `GROQ_API_KEY`, voice notes still flow through — they get a `[sin transcripción]`
+placeholder and the agent can still react. Text + photo paths are unaffected.
 
 ## Skeleton sanity-check checklist
 
