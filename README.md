@@ -154,6 +154,19 @@ On every Telegram event:
 7. Dashboard auto-refreshes every 5s and renders the summary, anomalies, and
    budget-by-category under each event.
 
+## Two runner paths
+
+Both use `claude-opus-4-7`. The webhook calls `runAgentOnEvent` which dispatches
+based on `USE_MANAGED_AGENTS`:
+
+| Path | When | How it works |
+|---|---|---|
+| **Messages + tool_use loop** | default (`USE_MANAGED_AGENTS` unset) | `client.messages.create({ tools, messages })` in a tool-use loop. Battle-tested, faster, no extra state. |
+| **Managed Agents Sessions** | `USE_MANAGED_AGENTS=true` | Beta `managed-agents-2026-04-01`. Lazily creates one **Environment** + one **Agent per mode** (cached in-process), opens a fresh **Session** per event, streams `agent.custom_tool_use` events, responds with `user.custom_tool_result`. Every run leaves a `sesn_*` id in `agent_runs.input` so a skeptical lender could replay the exact thread. |
+
+On failure, the managed path falls back to messages+tools so the demo never breaks.
+Each run stamps `input.runner` in `agent_runs` so you can tell which path executed.
+
 ## MCP scaffold
 
 The MCP server at [src/mcp-server/index.ts](src/mcp-server/index.ts) mirrors the runtime

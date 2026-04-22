@@ -67,7 +67,7 @@ export async function postPrices(opts: {
   return await res.json();
 }
 
-export async function waitForAgentRun(eventId: string, timeoutMs = 45000): Promise<{
+export async function waitForAgentRun(eventId: string, timeoutMs = 120000): Promise<{
   status: string;
   summary: string;
   tools: Array<{ name: string; input: unknown }>;

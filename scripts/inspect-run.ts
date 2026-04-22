@@ -5,7 +5,7 @@ async function main() {
   const sql = postgres(url, { ssl: url.includes(".railway.internal") ? false : "require", prepare: false });
   const n = Number(process.argv[2] ?? 1);
   const rows = await sql`
-    select ar.status, ar.output, ar.started_at, ar.ended_at,
+    select ar.status, ar.input, ar.output, ar.started_at, ar.ended_at,
            e.type as event_type, e.payload as event_payload
     from agent_runs ar
     join events e on e.id = ar.event_id
@@ -14,20 +14,19 @@ async function main() {
   `;
   for (const r of rows) {
     const output = typeof r.output === "string" ? JSON.parse(r.output) : r.output;
+    const input = typeof r.input === "string" ? JSON.parse(r.input) : r.input;
     console.log("========================================");
     console.log("status:", r.status, "|", r.started_at);
+    console.log("runner:", input.runner ?? "messages+tools");
+    if (input.session_id) console.log("session_id:", input.session_id);
+    if (input.agent_id) console.log("agent_id:", input.agent_id);
     console.log("event:", r.event_type, "→", (r.event_payload as any)?.text?.slice(0, 80) ?? JSON.stringify(r.event_payload).slice(0, 80));
     console.log("summary:", output.summary);
-    console.log("usage:", output.usage);
+    console.log("stopReason:", output.stopReason);
     console.log("tools:");
     for (const t of output.toolsCalled ?? []) {
-      console.log(`  ${t.name}:`, JSON.stringify(t.input).slice(0, 180));
+      console.log(`  ${t.name}`);
     }
-  }
-  const anomalies = await sql`select kind, severity, agent_message from anomalies order by created_at desc limit 10`;
-  console.log("\n========= anomalies =========");
-  for (const a of anomalies) {
-    console.log(`[${a.severity}] ${a.kind}: ${a.agent_message}`);
   }
   await sql.end();
 }

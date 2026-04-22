@@ -1,16 +1,11 @@
-// Real Opus 4.7 agent runner. Given a Telegram-sourced event, the runner:
-//   1. Materializes the event as a multimodal Messages API user turn
-//        - text → text block
-//        - photo → image block (base64)
-//        - voice → Spanish transcription via Whisper, then text block
-//   2. Calls claude-opus-4-7 with the tool set defined in ./tools.ts
-//   3. Loops on tool_use responses: executes each tool, returns tool_result, re-prompts
-//   4. Persists the full transcript, tool calls, and final summary into agent_runs
-//
-// Managed Agents Sessions would be a drop-in upgrade: same prompt + tools, but with
-// persistent per-project sessions. Leaving that as TODO(POLISH) — the hackathon
-// judging cares more about the output than the transport shape, and this path is
-// battle-tested.
+// Real Opus 4.7 agent runner. Two paths share this module's entry point
+// (`runAgentOnEvent`):
+//   - Messages+tools (default): multimodal user turn → claude-opus-4-7 → tool_use
+//     loop → persist transcript. Battle-tested, what the demo runs on.
+//   - Managed Agents Sessions (beta managed-agents-2026-04-01): dispatched when
+//     USE_MANAGED_AGENTS=true. See `./managed.ts` for the Session lifecycle.
+//     On any failure in that path we fall back to Messages+tools so the demo
+//     stays bulletproof.
 
 import type Anthropic from "@anthropic-ai/sdk";
 import { sql } from "@/lib/db";
@@ -50,6 +45,21 @@ type UserBlock =
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 export async function runAgentOnEvent(eventId: string): Promise<AgentOutput> {
+  if (process.env.USE_MANAGED_AGENTS === "true") {
+    try {
+      const { runAgentOnEventManaged } = await import("./managed");
+      return await runAgentOnEventManaged(eventId);
+    } catch (err) {
+      console.error(
+        "[agent] managed-sessions path failed, falling back to messages+tools:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+  return runAgentOnEventMessages(eventId);
+}
+
+async function runAgentOnEventMessages(eventId: string): Promise<AgentOutput> {
   const rows = await sql<
     Array<{
       id: string;
