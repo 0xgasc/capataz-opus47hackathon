@@ -386,7 +386,12 @@ export default async function DashboardModePage({
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-xs uppercase tracking-wider text-zinc-500">Capataz · panel</p>
+              <Link
+                href="/"
+                className="text-xs uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
+              >
+                Capataz · panel
+              </Link>
               <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border border-emerald-900/60 bg-emerald-950/40 text-emerald-300">
                 {copy.label}
               </span>
