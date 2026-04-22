@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { formatGTQ, formatDateTime } from "@/lib/format";
@@ -140,9 +141,10 @@ async function loadDashboard(mode: Mode) {
     from project_scores
     where project_id = ${project.id}
     order by computed_at desc
-    limit 1
+    limit 2
   `;
   const score = scoreRows[0] ?? null;
+  const previousScore = scoreRows[1]?.score ?? null;
 
   return {
     project,
@@ -157,6 +159,7 @@ async function loadDashboard(mode: Mode) {
     events,
     anomalies,
     score,
+    previousScore,
   };
 }
 
@@ -247,9 +250,11 @@ function scoreColor(score: number): string {
 
 function ScoreCard({
   score,
+  previousScore,
   label,
 }: {
   score: ScoreRow | null;
+  previousScore: number | null;
   label: string;
 }) {
   const value = score?.score ?? null;
@@ -260,14 +265,26 @@ function ScoreCard({
     ["Anomaly rate", Number(components.anomaly_rate ?? 0)],
     ["Activity freshness", Number(components.activity_freshness ?? 0)],
   ];
+  const delta = value != null && previousScore != null ? value - previousScore : null;
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-4 flex items-center gap-6 flex-wrap">
       <div>
         <p className="text-[11px] uppercase tracking-wider text-zinc-500">{label}</p>
-        <p className={`text-4xl font-semibold tabular-nums ${value == null ? "text-zinc-500" : scoreColor(value)}`}>
-          {value ?? "—"}
-          <span className="text-sm text-zinc-500 ml-1">/100</span>
-        </p>
+        <div className="flex items-baseline gap-2">
+          <p className={`text-4xl font-semibold tabular-nums ${value == null ? "text-zinc-500" : scoreColor(value)}`}>
+            {value ?? "—"}
+            <span className="text-sm text-zinc-500 ml-1">/100</span>
+          </p>
+          {delta != null && delta !== 0 && (
+            <span
+              className={`text-xs tabular-nums font-medium ${
+                delta > 0 ? "text-emerald-400" : "text-rose-400"
+              }`}
+            >
+              {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}
+            </span>
+          )}
+        </div>
         {score && (
           <p className="text-[10px] text-zinc-500 mt-0.5">
             {score.computed_by} · {formatDateTime(score.computed_at)}
@@ -319,7 +336,7 @@ export default async function DashboardModePage({
     );
   }
 
-  const { project, budget, spent, total, pct, totalCommitted, totalMarket, driftGtq, driftPct, events, anomalies, score } = data;
+  const { project, budget, spent, total, pct, totalCommitted, totalMarket, driftGtq, driftPct, events, anomalies, score, previousScore } = data;
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -346,7 +363,7 @@ export default async function DashboardModePage({
         </div>
 
         <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
-          <ScoreCard score={score} label={copy.scoreLabel} />
+          <ScoreCard score={score} previousScore={previousScore} label={copy.scoreLabel} />
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-4 min-w-[260px]">
             <p className="text-[11px] uppercase tracking-wider text-zinc-500">
               {copy.valueLabel}
@@ -432,34 +449,36 @@ export default async function DashboardModePage({
                 const trans = transcription(ev.agent_output);
                 const tools = toolsList(ev.agent_output);
                 return (
-                  <li
-                    key={ev.id}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3"
-                  >
-                    <div className="flex items-center gap-2 text-xs text-zinc-400 flex-wrap">
-                      <EventTypeBadge type={ev.type} />
-                      <AgentStatusBadge status={ev.agent_status} />
-                      <span>{ev.created_by ?? "—"}</span>
-                      <span className="ml-auto tabular-nums">{formatDateTime(ev.created_at)}</span>
-                    </div>
-                    <p className="mt-1.5 text-sm text-zinc-100 break-words">
-                      {previewPayload(ev.payload)}
-                    </p>
-                    {trans && ev.type === "voice_note" && (
-                      <p className="mt-1 text-xs italic text-zinc-400 break-words">
-                        🎙️ {trans}
+                  <li key={ev.id}>
+                    <Link
+                      href={`/runs/${ev.id}`}
+                      className="block rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 hover:border-zinc-700 hover:bg-zinc-900 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 text-xs text-zinc-400 flex-wrap">
+                        <EventTypeBadge type={ev.type} />
+                        <AgentStatusBadge status={ev.agent_status} />
+                        <span>{ev.created_by ?? "—"}</span>
+                        <span className="ml-auto tabular-nums">{formatDateTime(ev.created_at)}</span>
+                      </div>
+                      <p className="mt-1.5 text-sm text-zinc-100 break-words">
+                        {previewPayload(ev.payload)}
                       </p>
-                    )}
-                    {summary && (
-                      <p className="mt-2 text-sm text-emerald-200/90 border-l-2 border-emerald-800 pl-3 break-words">
-                        {summary}
-                      </p>
-                    )}
-                    {tools.length > 0 && (
-                      <p className="mt-1.5 text-[10px] text-zinc-500 uppercase tracking-wider">
-                        herramientas: {tools.join(" · ")}
-                      </p>
-                    )}
+                      {trans && ev.type === "voice_note" && (
+                        <p className="mt-1 text-xs italic text-zinc-400 break-words">
+                          🎙️ {trans}
+                        </p>
+                      )}
+                      {summary && (
+                        <p className="mt-2 text-sm text-emerald-200/90 border-l-2 border-emerald-800 pl-3 break-words">
+                          {summary}
+                        </p>
+                      )}
+                      {tools.length > 0 && (
+                        <p className="mt-1.5 text-[10px] text-zinc-500 uppercase tracking-wider">
+                          herramientas: {tools.join(" · ")} <span className="text-zinc-600">· ver traza →</span>
+                        </p>
+                      )}
+                    </Link>
                   </li>
                 );
               })}
