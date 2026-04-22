@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sql } from "@/lib/db";
@@ -78,7 +79,6 @@ export async function POST(req: NextRequest) {
       file_id: msg.voice.file_id,
       duration: msg.voice.duration,
       chat_id: msg.chat.id,
-      // TODO(MVP): download voice file via telegram.downloadFile + upload to storage
     };
   } else if (msg.photo && msg.photo.length > 0) {
     type = "photo";
@@ -87,7 +87,6 @@ export async function POST(req: NextRequest) {
       file_id: best.file_id,
       caption: msg.caption,
       chat_id: msg.chat.id,
-      // TODO(MVP): download photo via telegram.downloadFile + upload to storage
     };
   } else {
     type = "unknown";
@@ -107,17 +106,20 @@ export async function POST(req: NextRequest) {
   `;
   const eventId = inserted[0].id;
 
-  try {
-    await runAgentOnEvent(eventId);
-  } catch (err) {
-    console.error("[webhook] agent runner failed", err);
-  }
-
+  // Reply fast so Telegram doesn't retry; run Opus in the background.
   try {
     await sendMessage(msg.chat.id, "recibido ✓");
   } catch (err) {
     console.error("[webhook] reply failed", err);
   }
+
+  after(async () => {
+    try {
+      await runAgentOnEvent(eventId);
+    } catch (err) {
+      console.error("[webhook] agent runner failed", err);
+    }
+  });
 
   return NextResponse.json({ ok: true, eventId });
 }

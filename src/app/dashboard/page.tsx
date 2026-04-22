@@ -19,6 +19,8 @@ type EventRow = {
   payload: unknown;
   created_by: string | null;
   created_at: string;
+  agent_status: string | null;
+  agent_output: unknown;
 };
 
 type AnomalyRow = {
@@ -28,6 +30,12 @@ type AnomalyRow = {
   status: string;
   agent_message: string | null;
   created_at: string;
+};
+
+type BudgetRow = {
+  category: string;
+  committed_gtq: string;
+  spent_gtq: string;
 };
 
 async function loadDashboard() {
@@ -40,20 +48,33 @@ async function loadDashboard() {
   const project = projects[0];
   if (!project) return null;
 
-  const spentRows = await sql<Array<{ spent: string }>>`
-    select coalesce(sum(spent_gtq), 0)::text as spent
+  const budget = await sql<BudgetRow[]>`
+    select category,
+           coalesce(sum(qty * unit_cost_gtq), 0)::text as committed_gtq,
+           coalesce(sum(spent_gtq), 0)::text as spent_gtq
     from budget_items
     where project_id = ${project.id}
+    group by category
+    order by coalesce(sum(qty * unit_cost_gtq), 0) desc
   `;
-  const spent = Number(spentRows[0]?.spent ?? 0);
+
+  const spent = budget.reduce((acc, b) => acc + Number(b.spent_gtq), 0);
   const total = Number(project.total_budget_gtq);
   const pct = total > 0 ? Math.min(100, (spent / total) * 100) : 0;
 
   const events = await sql<EventRow[]>`
-    select id, type, payload, created_by, created_at
-    from events
-    where project_id = ${project.id}
-    order by created_at desc
+    select e.id, e.type, e.payload, e.created_by, e.created_at,
+           ar.status as agent_status, ar.output as agent_output
+    from events e
+    left join lateral (
+      select status, output
+      from agent_runs
+      where event_id = e.id
+      order by started_at desc
+      limit 1
+    ) ar on true
+    where e.project_id = ${project.id}
+    order by e.created_at desc
     limit 20
   `;
 
@@ -65,7 +86,7 @@ async function loadDashboard() {
     limit 20
   `;
 
-  return { project, spent, total, pct, events, anomalies };
+  return { project, budget, spent, total, pct, events, anomalies };
 }
 
 function previewPayload(raw: unknown) {
@@ -73,7 +94,27 @@ function previewPayload(raw: unknown) {
   if (typeof p.text === "string") return p.text;
   if (typeof p.caption === "string") return p.caption;
   if (typeof p.file_id === "string") return `file_id: ${String(p.file_id).slice(0, 18)}…`;
-  return JSON.stringify(p).slice(0, 120);
+  return JSON.stringify(p).slice(0, 160);
+}
+
+function agentSummary(raw: unknown): string | null {
+  const o = asObject(raw);
+  const s = typeof o.summary === "string" ? o.summary.trim() : "";
+  return s || null;
+}
+
+function transcription(raw: unknown): string | null {
+  const o = asObject(raw);
+  const t = asObject(o.transcription);
+  return typeof t.text === "string" && t.text ? t.text : null;
+}
+
+function toolsList(raw: unknown): string[] {
+  const o = asObject(raw);
+  if (!Array.isArray(o.toolsCalled)) return [];
+  return (o.toolsCalled as Array<{ name?: unknown }>)
+    .map((t) => (typeof t.name === "string" ? t.name : ""))
+    .filter(Boolean);
 }
 
 function EventTypeBadge({ type }: { type: string }) {
@@ -85,6 +126,43 @@ function EventTypeBadge({ type }: { type: string }) {
   return (
     <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
       {label}
+    </span>
+  );
+}
+
+function AgentStatusBadge({ status }: { status: string | null }) {
+  if (!status) {
+    return (
+      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-900 text-zinc-500 border border-zinc-800">
+        pendiente
+      </span>
+    );
+  }
+  const map: Record<string, string> = {
+    ok: "bg-emerald-950/40 text-emerald-300 border-emerald-900/60",
+    degraded: "bg-amber-950/40 text-amber-300 border-amber-900/60",
+    error: "bg-rose-950/40 text-rose-300 border-rose-900/60",
+    stub: "bg-zinc-900 text-zinc-400 border-zinc-800",
+  };
+  const cls = map[status] ?? "bg-zinc-900 text-zinc-400 border-zinc-800";
+  return (
+    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${cls}`}>
+      opus: {status}
+    </span>
+  );
+}
+
+function SeverityChip({ severity }: { severity: string }) {
+  const map: Record<string, string> = {
+    critical: "bg-rose-900/40 text-rose-200 border-rose-800",
+    high: "bg-orange-900/40 text-orange-200 border-orange-800",
+    medium: "bg-amber-900/40 text-amber-200 border-amber-800",
+    low: "bg-zinc-800 text-zinc-300 border-zinc-700",
+  };
+  const cls = map[severity] ?? map.low;
+  return (
+    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${cls}`}>
+      {severity}
     </span>
   );
 }
@@ -103,7 +181,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const { project, spent, total, pct, events, anomalies } = data;
+  const { project, budget, spent, total, pct, events, anomalies } = data;
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -121,7 +199,7 @@ export default async function DashboardPage() {
                 : "—"}
             </p>
           </div>
-          <div className="flex-1 min-w-[260px] max-w-md">
+          <div className="flex-1 min-w-[280px] max-w-md">
             <div className="flex items-baseline justify-between text-xs text-zinc-400 mb-1">
               <span>Presupuesto</span>
               <span>
@@ -137,6 +215,31 @@ export default async function DashboardPage() {
             <p className="text-[11px] text-zinc-500 mt-1">{pct.toFixed(1)}% ejecutado</p>
           </div>
         </div>
+
+        {budget.length > 0 && (
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {budget.map((b) => {
+              const committed = Number(b.committed_gtq);
+              const catSpent = Number(b.spent_gtq);
+              const over = committed > 0 && catSpent / committed > 1;
+              return (
+                <li
+                  key={b.category}
+                  className={`text-[11px] px-2.5 py-1 rounded-md border ${
+                    over
+                      ? "bg-rose-950/30 text-rose-200 border-rose-900/50"
+                      : "bg-zinc-900/60 text-zinc-300 border-zinc-800"
+                  }`}
+                >
+                  <span className="uppercase tracking-wider mr-2">{b.category}</span>
+                  <span className="tabular-nums">
+                    {formatGTQ(catSpent)} / {formatGTQ(committed)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </header>
 
       <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 px-6 py-6">
@@ -150,21 +253,42 @@ export default async function DashboardPage() {
             </p>
           ) : (
             <ul className="space-y-2">
-              {events.map((ev) => (
-                <li
-                  key={ev.id}
-                  className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3"
-                >
-                  <div className="flex items-center gap-3 text-xs text-zinc-400">
-                    <EventTypeBadge type={ev.type} />
-                    <span>{ev.created_by ?? "—"}</span>
-                    <span className="ml-auto tabular-nums">{formatDateTime(ev.created_at)}</span>
-                  </div>
-                  <p className="mt-1.5 text-sm text-zinc-100 break-words">
-                    {previewPayload(ev.payload)}
-                  </p>
-                </li>
-              ))}
+              {events.map((ev) => {
+                const summary = agentSummary(ev.agent_output);
+                const trans = transcription(ev.agent_output);
+                const tools = toolsList(ev.agent_output);
+                return (
+                  <li
+                    key={ev.id}
+                    className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3"
+                  >
+                    <div className="flex items-center gap-2 text-xs text-zinc-400 flex-wrap">
+                      <EventTypeBadge type={ev.type} />
+                      <AgentStatusBadge status={ev.agent_status} />
+                      <span>{ev.created_by ?? "—"}</span>
+                      <span className="ml-auto tabular-nums">{formatDateTime(ev.created_at)}</span>
+                    </div>
+                    <p className="mt-1.5 text-sm text-zinc-100 break-words">
+                      {previewPayload(ev.payload)}
+                    </p>
+                    {trans && ev.type === "voice_note" && (
+                      <p className="mt-1 text-xs italic text-zinc-400 break-words">
+                        🎙️ {trans}
+                      </p>
+                    )}
+                    {summary && (
+                      <p className="mt-2 text-sm text-emerald-200/90 border-l-2 border-emerald-800 pl-3 break-words">
+                        {summary}
+                      </p>
+                    )}
+                    {tools.length > 0 && (
+                      <p className="mt-1.5 text-[10px] text-zinc-500 uppercase tracking-wider">
+                        herramientas: {tools.join(" · ")}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -182,13 +306,15 @@ export default async function DashboardPage() {
                   key={a.id}
                   className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-4 py-3"
                 >
-                  <div className="flex items-center gap-3 text-xs text-amber-300">
-                    <span className="uppercase tracking-wider">{a.severity}</span>
+                  <div className="flex items-center gap-2 text-xs text-amber-300 flex-wrap">
+                    <SeverityChip severity={a.severity} />
                     <span className="text-amber-500/70">·</span>
-                    <span>{a.kind}</span>
+                    <span className="truncate">{a.kind}</span>
                     <span className="ml-auto tabular-nums">{formatDateTime(a.created_at)}</span>
                   </div>
-                  <p className="mt-1.5 text-sm text-zinc-100">{a.agent_message ?? "—"}</p>
+                  <p className="mt-1.5 text-sm text-zinc-100 break-words">
+                    {a.agent_message ?? "—"}
+                  </p>
                 </li>
               ))}
             </ul>

@@ -66,11 +66,16 @@ Full deploy steps (Vercel + Telegram webhook registration): see [DEPLOY.md](./DE
 
 ```
 DATABASE_URL              Railway Postgres (use public proxy URL for Vercel)
-ANTHROPIC_API_KEY         required for MVP, unused in skeleton
+ANTHROPIC_API_KEY         Opus 4.7 agent — required for real runs, runner falls back to 'degraded' without it
+GROQ_API_KEY              preferred transcription (whisper-large-v3, free tier, Spanish)
+OPENAI_API_KEY            fallback transcription (whisper-1)
 TELEGRAM_BOT_TOKEN        from @BotFather
 TELEGRAM_WEBHOOK_SECRET   any 32+ char random string, matches Telegram header
-TELEGRAM_DEFAULT_CHAT_ID  reserved for MVP broadcasts
+TELEGRAM_DEFAULT_CHAT_ID  reserved for future broadcast features
 ```
+
+If both `GROQ_API_KEY` and `OPENAI_API_KEY` are missing, voice notes still flow through the
+system — they're logged with a placeholder transcript and the agent runs on that placeholder.
 
 ## Skeleton sanity-check checklist
 
@@ -83,14 +88,30 @@ After deploy, these should all pass:
 - [ ] Send a voice note → row with `type='voice_note'` and `payload.file_id` populated
 - [ ] Send a photo → row with `type='photo'` and `payload.file_id` + optional `caption`
 
-## What's stubbed
+## MVP agent loop
 
-Greppable: `TODO(MVP)`. Concretely:
+On every Telegram event:
 
-- `src/lib/agent/runner.ts` — writes a fake `agent_runs` row; no Opus call yet.
-- `src/lib/telegram.ts#downloadFile` — returns `Buffer.alloc(0)`.
-- `src/mcp-server/index.ts` — every tool returns `{ stub: true, tool, input }`.
-- Webhook does not persist media; only stores the `file_id`.
+1. Webhook inserts an `events` row and immediately replies `recibido ✓`.
+2. `next/server.after()` kicks `runAgentOnEvent(id)` into the background.
+3. Runner assembles a multimodal user message — text goes as text, photos as base64
+   image blocks, voice notes are transcribed via Whisper (Groq preferred) and passed as
+   text.
+4. `claude-opus-4-7` is called with `CAPATAZ_SYSTEM_PROMPT` (Spanish/chapín-aware) and
+   four tools: `query_project_state`, `log_event`, `flag_anomaly`, `reply_in_chat`.
+5. A tool-use loop runs up to 6 turns. Tool handlers are plain TS in
+   [src/lib/agent/tools.ts](src/lib/agent/tools.ts) that hit the DB directly.
+6. The full trace (transcription, tool calls, final summary, usage) is persisted to
+   `agent_runs.output`.
+7. Dashboard auto-refreshes every 5s and renders the summary, anomalies, and
+   budget-by-category under each event.
+
+## MCP scaffold
+
+The MCP server at [src/mcp-server/index.ts](src/mcp-server/index.ts) mirrors the runtime
+tool surface over stdio. It's not wired into the agent for MVP — the runner calls the
+same handlers directly because MCP-over-HTTP on Vercel serverless is a trap for a 3-day
+sprint. The scaffold is here so the tools can be externalized in POLISH.
 
 ## License
 

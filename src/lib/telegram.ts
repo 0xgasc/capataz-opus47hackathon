@@ -30,9 +30,26 @@ export async function getFileUrl(fileId: string): Promise<string> {
   return `${API}/file/bot${token()}/${data.result.file_path}`;
 }
 
-export async function downloadFile(fileId: string): Promise<Buffer> {
-  // TODO(MVP): fetch the file from Telegram CDN via getFileUrl and upload to persistent storage
-  // (Cloudflare R2 or equivalent), then return the bytes or a storage key.
-  console.warn(`[telegram.downloadFile] STUB for file_id=${fileId}`);
-  return Buffer.alloc(0);
+export async function downloadFile(fileId: string): Promise<{ buffer: Buffer; mime: string; path: string }> {
+  const url = await getFileUrl(fileId);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`telegram file fetch failed: ${res.status}`);
+  const arrayBuf = await res.arrayBuffer();
+  const buffer = Buffer.from(arrayBuf);
+  const mime = res.headers.get("content-type") ?? inferMimeFromPath(url);
+  const path = new URL(url).pathname;
+  return { buffer, mime, path };
+}
+
+function inferMimeFromPath(urlOrPath: string): string {
+  const p = urlOrPath.toLowerCase();
+  if (p.endsWith(".oga") || p.endsWith(".ogg")) return "audio/ogg";
+  if (p.endsWith(".mp3")) return "audio/mpeg";
+  if (p.endsWith(".m4a")) return "audio/mp4";
+  if (p.endsWith(".wav")) return "audio/wav";
+  if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+  if (p.endsWith(".png")) return "image/png";
+  if (p.endsWith(".webp")) return "image/webp";
+  if (p.endsWith(".gif")) return "image/gif";
+  return "application/octet-stream";
 }

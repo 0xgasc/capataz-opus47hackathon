@@ -65,6 +65,9 @@ pnpm dlx vercel@latest login
 pnpm dlx vercel@latest link          # answer the prompts — creates .vercel/
 pnpm dlx vercel@latest env add DATABASE_URL production
 pnpm dlx vercel@latest env add ANTHROPIC_API_KEY production
+# one of the two is required for voice-note transcription
+pnpm dlx vercel@latest env add GROQ_API_KEY production        # free + fast (preferred)
+pnpm dlx vercel@latest env add OPENAI_API_KEY production      # fallback
 pnpm dlx vercel@latest env add TELEGRAM_BOT_TOKEN production
 pnpm dlx vercel@latest env add TELEGRAM_WEBHOOK_SECRET production
 pnpm dlx vercel@latest env add TELEGRAM_DEFAULT_CHAT_ID production
