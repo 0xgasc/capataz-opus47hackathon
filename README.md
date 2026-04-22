@@ -161,6 +161,64 @@ tool surface over stdio. It's not wired into the agent for MVP — the runner ca
 same handlers directly because MCP-over-HTTP on Vercel serverless is a trap for a 3-day
 sprint. The scaffold is here so the tools can be externalized in POLISH.
 
+## Demo scenarios
+
+Scripted in `scripts/demo/*.ts`. Each one posts a Telegram-shaped payload to the
+webhook, waits for Opus to finish, and prints the tool trace + anomalies + final
+Spanish summary. Runs against localhost by default; pass a `CAPATAZ_BASE` env var
+to hit a deployed instance.
+
+```bash
+pnpm demo:reset        # wipe events, runs, anomalies, non-manual price snapshots
+pnpm demo:1            # normal construction delivery — happy path
+pnpm demo:2            # off-hours + unknown supplier — 2 anomalies raised
+pnpm demo:3            # overnight market shock — admin pushes new prices, score reacts
+pnpm demo:4            # inventory stock_out to a known counterparty
+pnpm demo:5            # inventory shrinkage (stock_out with no counterparty, flags HIGH)
+```
+
+Against the deployed instance:
+
+```bash
+CAPATAZ_BASE=https://<your-railway-domain> pnpm demo:2
+```
+
+## Railway deploy (one-time)
+
+From the project root, after `railway login`:
+
+```bash
+railway init --name capataz
+railway add --database postgres          # answer prompts
+railway add --service capataz-web        # the Next.js app
+
+# Link this directory to the app service
+railway service link capataz-web
+
+# Env vars on the app service (Postgres URL uses Railway reference syntax)
+railway variables --service capataz-web \
+  --set 'DATABASE_URL=${{Postgres.DATABASE_URL}}' \
+  --set 'ANTHROPIC_API_KEY=sk-ant-...' \
+  --set 'GROQ_API_KEY=gsk_...' \
+  --set 'ADMIN_SECRET=<openssl rand -hex 24>' \
+  --set 'NODE_ENV=production'
+
+# Apply migrations against Railway Postgres (locally, targeting public URL)
+set -a && . ./.env.local && set +a
+pnpm db:migrate
+
+# Deploy
+railway up --service capataz-web --ci
+
+# Public URL
+railway domain --service capataz-web
+```
+
+That's it. Railway's Railpack auto-detects Next.js and runs `pnpm build && pnpm start`
+with the PORT env var wired for you. Since the app and Postgres live in the same
+Railway project, `DATABASE_URL` resolves to the private internal endpoint — no
+egress, no SSL handshake cost.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).

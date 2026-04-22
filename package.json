@@ -8,7 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "tsx scripts/migrate.ts",
-    "mcp:dev": "tsx src/mcp-server/index.ts"
+    "mcp:dev": "tsx src/mcp-server/index.ts",
+    "demo:1": "tsx scripts/demo/01-normal-delivery.ts",
+    "demo:2": "tsx scripts/demo/02-off-hours-anomaly.ts",
+    "demo:3": "tsx scripts/demo/03-price-shock.ts",
+    "demo:4": "tsx scripts/demo/04-inventory-sale.ts",
+    "demo:5": "tsx scripts/demo/05-inventory-shrinkage.ts",
+    "demo:reset": "tsx scripts/demo/06-reset.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -18,6 +24,9 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.3.6"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -55,7 +55,14 @@ Refresh the dashboard within 5s — the event should appear.
 
 ---
 
-## 3. Deploy the Next.js app to Vercel
+## 3. Deploy the Next.js app
+
+See **README.md § Railway deploy** for the Railway-CLI path we actually use. The
+legacy Vercel notes below are kept for reference — the Railway flow is simpler
+because app + DB live in the same project and `DATABASE_URL` is injected via
+Railway's reference syntax.
+
+### Legacy: Vercel deploy
 
 ```bash
 # one-time: install and log in
