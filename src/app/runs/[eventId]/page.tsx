@@ -113,7 +113,7 @@ export default async function RunInspectorPage({
   const hasRuns = runs.length > 0;
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 px-6 py-6">
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 px-4 sm:px-6 py-5 sm:py-6">
       {!hasRuns && <AutoRefresh intervalMs={2000} />}
       <div className="max-w-4xl mx-auto">
         <nav className="text-xs text-zinc-500 mb-4">
@@ -136,7 +136,7 @@ export default async function RunInspectorPage({
           <p className="text-xs text-zinc-500 mt-0.5 font-mono">{event.id}</p>
         </header>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 mb-5">
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-5 mb-4 sm:mb-5">
           <h2 className="text-xs uppercase tracking-wider text-zinc-400 mb-3">Evento</h2>
           <div className="grid grid-cols-2 gap-4 mb-3">
             <Field label="Reportado por">{event.created_by ?? "—"}</Field>
@@ -182,7 +182,7 @@ export default async function RunInspectorPage({
             return (
               <section
                 key={run.id}
-                className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 mb-5"
+                className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-5 mb-4 sm:mb-5"
               >
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   <h2 className="text-xs uppercase tracking-wider text-zinc-400">

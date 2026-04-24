@@ -306,7 +306,7 @@ function ScoreCard({
   ];
   const delta = value != null && previousScore != null ? value - previousScore : null;
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-4 flex items-center gap-6 flex-wrap">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 sm:px-5 py-4 flex items-center gap-4 sm:gap-6 flex-wrap">
       <div>
         <p className="text-[11px] uppercase tracking-wider text-zinc-500">{label}</p>
         <div className="flex items-baseline gap-2">
@@ -331,7 +331,7 @@ function ScoreCard({
         )}
         <ScoreSparkline values={history} />
       </div>
-      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 min-w-[260px]">
+      <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-2 w-full min-w-0">
         {rows.map(([name, n]) => {
           const pct = Math.max(0, Math.min(100, (n / 25) * 100));
           return (
@@ -382,8 +382,8 @@ export default async function DashboardModePage({
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
       <AutoRefresh />
 
-      <header className="border-b border-zinc-800 bg-zinc-900/50 px-6 py-5">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+      <header className="border-b border-zinc-800 bg-zinc-900/50 px-4 sm:px-6 py-4 sm:py-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <div className="flex items-center gap-2">
               <Link
@@ -396,8 +396,8 @@ export default async function DashboardModePage({
                 {copy.label}
               </span>
             </div>
-            <h1 className="text-2xl font-semibold mt-1">{project.name}</h1>
-            <p className="text-sm text-zinc-400 mt-0.5">
+            <h1 className="text-xl sm:text-2xl font-semibold mt-1 break-words">{project.name}</h1>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
               {project.client ?? "—"} · inicio{" "}
               {project.start_date
                 ? new Date(project.start_date).toISOString().slice(0, 10)
@@ -407,14 +407,14 @@ export default async function DashboardModePage({
           <ModeSwitcher current={mode} />
         </div>
 
-        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4">
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 sm:gap-4">
           <ScoreCard
             score={score}
             previousScore={previousScore}
             history={history}
             label={copy.scoreLabel}
           />
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-4 min-w-[260px]">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 sm:px-5 py-4 lg:min-w-[240px]">
             <p className="text-[11px] uppercase tracking-wider text-zinc-500">
               {copy.valueLabel}
             </p>
@@ -485,7 +485,7 @@ export default async function DashboardModePage({
         )}
       </header>
 
-      <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 px-6 py-6">
+      <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5 lg:gap-6 px-4 sm:px-6 py-5 sm:py-6">
         <div>
           <h2 className="text-sm uppercase tracking-wider text-zinc-400 mb-3">
             {copy.timelineLabel}

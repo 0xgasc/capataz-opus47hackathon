@@ -56,19 +56,17 @@ export default async function Landing() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <div className="max-w-4xl mx-auto w-full px-6 py-12 flex-1 flex flex-col">
-        <header className="mb-10">
+      <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex-1 flex flex-col">
+        <header className="mb-8 sm:mb-10">
           <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 mb-3">
             Capataz · Claude Opus 4.7
           </p>
-          <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-            Un agente que vive dentro del grupo de Telegram del equipo,
-            <br />
-            convierte notas de voz y fotos en estado estructurado,
-            <br />
-            y emite un score auditable que un prestamista puede revisar.
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight tracking-tight">
+            Un agente que vive dentro del grupo de Telegram del equipo, convierte notas de
+            voz y fotos en estado estructurado, y emite un score auditable que un
+            prestamista puede revisar.
           </h1>
-          <p className="text-zinc-400 mt-4 text-base leading-relaxed max-w-2xl">
+          <p className="text-zinc-400 mt-4 text-sm sm:text-base leading-relaxed max-w-2xl">
             Capataz es el primer vertical de una plataforma para operaciones físicas:
             construcción hoy, inventarios distribuidos mañana, cualquier activo físico donde
             alguien reporta movimientos por WhatsApp-o-similar y nadie tiene un ERP.
@@ -84,14 +82,14 @@ export default async function Landing() {
               <Link
                 key={mode}
                 href={`/dashboard/${mode}`}
-                className="group rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 hover:border-emerald-900/70 hover:bg-zinc-900 transition-colors"
+                className="group rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6 hover:border-emerald-900/70 hover:bg-zinc-900 active:bg-zinc-900 transition-colors"
               >
                 <p className="text-[10px] uppercase tracking-[0.18em] text-emerald-400 mb-2">
                   {copy.lens}
                 </p>
-                <div className="flex items-start justify-between gap-4">
-                  <h2 className="text-xl font-semibold mb-2">{copy.title}</h2>
-                  <div className="text-right">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <h2 className="text-xl font-semibold">{copy.title}</h2>
+                  <div className="text-right shrink-0">
                     <p className="text-[10px] uppercase tracking-wider text-zinc-500">
                       {copy.scoreLabel}
                     </p>
@@ -105,7 +103,7 @@ export default async function Landing() {
                     </p>
                   </div>
                 </div>
-                <p className="text-sm text-zinc-400 leading-relaxed mb-4">{copy.desc}</p>
+                <p className="text-sm text-zinc-400 leading-relaxed mb-4 mt-3">{copy.desc}</p>
                 {s?.name && (
                   <p className="text-[11px] text-zinc-500 mt-2 truncate">
                     {s.name}
