@@ -7,6 +7,7 @@ import { MODULE_CATALOG, modulesForBusiness, isEnabled, isSuggested } from "@/li
 import { ModuleSuggestion } from "./module-card";
 import { RequestModule, type ModuleRequestRow } from "./request-module";
 import { CobrosWidget } from "./cobros-widget";
+import { DailySnapshot } from "./daily-snapshot";
 import { formatGTQ } from "@/lib/format";
 import { ModeSwitcher } from "./switcher";
 import { ChatInput } from "./chat-input";
@@ -342,6 +343,14 @@ export default async function DashboardPage({
       </header>
 
       <div className="flex-1 max-w-3xl w-full mx-auto flex flex-col">
+        {project.business_id && (
+          <DailySnapshot
+            businessId={project.business_id}
+            projectId={project.id}
+            showScore={!!valuation}
+          />
+        )}
+
         {valuation && (
           <section className="px-4 sm:px-5 pt-4">
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">

@@ -15,6 +15,7 @@
     "demo:4": "tsx scripts/demo/04-inventory-sale.ts",
     "demo:5": "tsx scripts/demo/05-inventory-shrinkage.ts",
     "demo:reset": "tsx scripts/demo/06-reset.ts",
+    "e2e": "tsx scripts/e2e/run-all.ts",
     "demo:7": "tsx scripts/demo/07-tiendita.ts",
     "demo:8": "tsx scripts/demo/08-memory.ts"
   },
