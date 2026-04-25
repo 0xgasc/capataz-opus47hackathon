@@ -66,20 +66,20 @@ export async function POST(req: NextRequest) {
     returning id
   `;
 
-  // Heuristic: if the user is modifying their baseline (adding/removing/completing
-  // tasks, changing suppliers, etc.) we route the call to Opus (intent='baseline_change').
-  // Routine reports stay on Sonnet.
+  // Tighter routing: Sonnet handles all chat (task management included — Sonnet is
+  // capable of list_tasks/complete_task/upsert_task). Opus is reserved for events
+  // that change the architecture of the business itself: onboarding, installing
+  // a new module, asking for design help. Detected via narrower keywords below.
   const msg = parsed.data.message.toLowerCase();
-  const baselineKeywords = [
-    "agregá", "agrega", "agregar", "añadí", "anadi", "añadir", "anadir",
-    "marcá", "marca", "marcar", "completá", "completa", "completar",
-    "borrá", "borra", "borrar", "quitá", "quita", "quitar", "eliminá", "eliminar",
-    "creá", "crear", "actualizá", "actualizar",
-    "recordame", "recordá", "recordar",
-    "tarea", "protocolo", "rutina", "rutinas",
+  const moduleKeywords = [
+    "activá el módulo", "activar el módulo", "activá módulo", "activar módulo",
+    "instalá el módulo", "instalar el módulo", "instalá módulo",
+    "valuación", "valuacion", "valuá", "valuar",
+    "necesito un módulo", "necesito modulo",
+    "rediseñá", "redisenar", "rediseño", "redisenio",
   ];
-  const isBaselineChange = baselineKeywords.some((kw) => msg.includes(kw));
-  const intent = isBaselineChange ? "baseline_change" : "routine_event";
+  const isModuleInstall = moduleKeywords.some((kw) => msg.includes(kw));
+  const intent = isModuleInstall ? "baseline_change" : "routine_event";
 
   try {
     const output = await runAgentOnEvent(eventRow.id, { intent });

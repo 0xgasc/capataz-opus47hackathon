@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { asObject } from "@/lib/json";
 import { buildSuggestions } from "@/lib/agent/suggestions";
+import { MODULE_CATALOG, modulesForBusiness, isEnabled, isSuggested } from "@/lib/modules";
+import { ModuleSuggestion } from "./module-card";
+import { formatGTQ } from "@/lib/format";
 import { ModeSwitcher } from "./switcher";
 import { ChatInput } from "./chat-input";
 import { ChatThread, type ChatMessage } from "./chat-thread";
@@ -162,6 +165,40 @@ async function loadDashboard(key: string) {
       `
     : [];
 
+  const moduleMap = project.business_id
+    ? await modulesForBusiness(project.business_id)
+    : new Map<string, "enabled" | "suggested" | "disabled">();
+  const valuationEnabled = isEnabled(moduleMap, "valuacion");
+  const firstSuggested = MODULE_CATALOG.find(
+    (m) => !m.baseline && isSuggested(moduleMap, m.key) && m.pitch.length > 0,
+  );
+
+  // Compute valuation snapshot only if the module is enabled.
+  let valuation: { committed_gtq: number; market_gtq: number; drift_gtq: number; drift_pct: number; score: number | null } | null = null;
+  if (valuationEnabled) {
+    const [budgetRow] = await sql<Array<{ committed: string; market: string }>>`
+      select
+        coalesce(sum(qty * unit_cost_gtq), 0)::text as committed,
+        coalesce(sum(qty * coalesce(market_unit_cost_gtq, unit_cost_gtq)), 0)::text as market
+      from budget_items
+      where project_id = ${project.id}
+    `;
+    const committed = Number(budgetRow?.committed ?? 0);
+    const market = Number(budgetRow?.market ?? 0);
+    const drift = market - committed;
+    const driftPct = committed > 0 ? (drift / committed) * 100 : 0;
+    const [scoreRow] = await sql<Array<{ score: number }>>`
+      select score from project_scores where project_id = ${project.id} order by computed_at desc limit 1
+    `;
+    valuation = {
+      committed_gtq: committed,
+      market_gtq: market,
+      drift_gtq: drift,
+      drift_pct: driftPct,
+      score: scoreRow?.score ?? null,
+    };
+  }
+
   const messages: ChatMessage[] = events.map((e) => {
     const p = asObject(e.payload);
     const out = asObject(e.agent_output);
@@ -203,6 +240,10 @@ async function loadDashboard(key: string) {
     tasks,
     recentItems,
     lastCheckIn: lastCheckIn[0] ?? null,
+    valuation,
+    suggestion: firstSuggested
+      ? { key: firstSuggested.key, name: firstSuggested.name, pitch: firstSuggested.pitch }
+      : null,
   };
 }
 
@@ -232,7 +273,7 @@ export default async function DashboardPage({
     );
   }
 
-  const { project, messages, tasks, recentItems, lastCheckIn } = data;
+  const { project, messages, tasks, recentItems, lastCheckIn, valuation, suggestion } = data;
   const mode = (project.mode as Mode) ?? "construction";
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
   const slug = project.business_slug;
@@ -282,6 +323,36 @@ export default async function DashboardPage({
       </header>
 
       <div className="flex-1 max-w-3xl w-full mx-auto flex flex-col">
+        {valuation && (
+          <section className="px-4 sm:px-5 pt-4">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-baseline gap-3">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500">Valuación</span>
+                <span className="text-2xl font-semibold tabular-nums text-zinc-100">
+                  {valuation.score ?? "—"}
+                  <span className="text-xs text-zinc-500 ml-1">/100</span>
+                </span>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500">Mercado vs costo</p>
+                <p
+                  className={`text-sm tabular-nums ${
+                    valuation.drift_gtq >= 0 ? "text-emerald-400" : "text-rose-400"
+                  }`}
+                >
+                  {valuation.drift_gtq >= 0 ? "+" : ""}
+                  {formatGTQ(valuation.drift_gtq)} ({valuation.drift_pct >= 0 ? "+" : ""}
+                  {valuation.drift_pct.toFixed(1)}%)
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {!valuation && suggestion && slug && (
+          <ModuleSuggestion slug={slug} suggestion={suggestion} />
+        )}
+
         {tasks.length > 0 && (
           <details className="border-b border-zinc-900" open={pendingCount > 0 && messages.length < 3}>
             <summary className="cursor-pointer px-4 sm:px-5 py-3 text-sm text-zinc-300 hover:text-zinc-100 flex items-center justify-between list-none">

@@ -8,6 +8,7 @@ import { sql } from "@/lib/db";
 import { sendMessage } from "@/lib/telegram";
 import { asObject } from "@/lib/json";
 import { computeScore, persistScore } from "@/lib/scoring";
+import { MODULE_CATALOG, modulesForBusiness, setModuleStatus } from "@/lib/modules";
 
 export type ToolDefinition = {
   name: string;
@@ -159,6 +160,40 @@ export const toolDefinitions: ToolDefinition[] = [
     },
   },
   {
+    name: "list_modules",
+    description:
+      "Lee qué módulos tiene activos / sugeridos el negocio. Llamala antes de sugerir uno nuevo, para no duplicar.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "suggest_module",
+    description:
+      "Sugiere activar un módulo opcional (valuacion, lender_view, etc.). Usá esto cuando el operador menciona algo que ese módulo resolvería — ej: pregunta por costos → suggest_module('valuacion'). NO actives el módulo, solo lo dejás 'suggested'; el usuario tiene que aceptar.",
+    input_schema: {
+      type: "object",
+      required: ["module_key", "reason"],
+      properties: {
+        module_key: { type: "string", enum: ["valuacion", "lender_view"] },
+        reason: {
+          type: "string",
+          description: "Una oración explicando POR QUÉ ahora.",
+        },
+      },
+    },
+  },
+  {
+    name: "install_module",
+    description:
+      "Activa un módulo opcional. SOLO usá esto si el operador dijo claramente que sí (ej: 'sí, activálo', 'dale', 'sí por favor'). Si la intención no es clara, usá suggest_module.",
+    input_schema: {
+      type: "object",
+      required: ["module_key"],
+      properties: {
+        module_key: { type: "string", enum: ["valuacion", "lender_view"] },
+      },
+    },
+  },
+  {
     name: "reply_in_chat",
     description:
       "Send a short Spanish message back to the Telegram chat. Use sparingly — only when the operator needs immediate feedback (e.g. you flagged a serious anomaly and want to confirm). The webhook already sends 'recibido ✓' automatically; don't duplicate that.",
@@ -197,6 +232,12 @@ export async function runTool(
       return { ok: true, result: await flagAnomaly(input, ctx) };
     case "recompute_score":
       return { ok: true, result: await recomputeScore(ctx) };
+    case "list_modules":
+      return { ok: true, result: await listModulesTool(ctx) };
+    case "suggest_module":
+      return { ok: true, result: await suggestModuleTool(input, ctx) };
+    case "install_module":
+      return { ok: true, result: await installModuleTool(input, ctx) };
     case "list_tasks":
       return { ok: true, result: await listTasks(input, ctx) };
     case "complete_task":
@@ -413,6 +454,40 @@ async function upsertTask(input: Record<string, unknown>, ctx: ToolContext) {
     returning id
   `;
   return { created: rows[0].id };
+}
+
+async function listModulesTool(ctx: ToolContext) {
+  if (!ctx.businessId) return { modules: [], note: "no business linked" };
+  const map = await modulesForBusiness(ctx.businessId);
+  return {
+    catalog: MODULE_CATALOG.map((m) => ({
+      key: m.key,
+      name: m.name,
+      one_liner: m.one_liner,
+      pitch: m.pitch,
+      baseline: m.baseline,
+      status: map.get(m.key) ?? (m.baseline ? "enabled" : "suggested"),
+    })),
+  };
+}
+
+async function suggestModuleTool(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { ok: false, error: "no business linked" };
+  const key = String(input.module_key ?? "");
+  const reason = String(input.reason ?? "");
+  const exists = MODULE_CATALOG.find((m) => m.key === key);
+  if (!exists || exists.baseline) return { ok: false, error: "invalid module key" };
+  await setModuleStatus(ctx.businessId, key, "suggested", "agent");
+  return { ok: true, suggested: key, reason };
+}
+
+async function installModuleTool(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { ok: false, error: "no business linked" };
+  const key = String(input.module_key ?? "");
+  const exists = MODULE_CATALOG.find((m) => m.key === key);
+  if (!exists || exists.baseline) return { ok: false, error: "invalid module key" };
+  await setModuleStatus(ctx.businessId, key, "enabled", "agent");
+  return { ok: true, enabled: key };
 }
 
 async function replyInChat(input: Record<string, unknown>, ctx: ToolContext) {
