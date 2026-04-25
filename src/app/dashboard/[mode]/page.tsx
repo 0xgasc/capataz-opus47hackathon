@@ -5,6 +5,7 @@ import { asObject } from "@/lib/json";
 import { buildSuggestions } from "@/lib/agent/suggestions";
 import { MODULE_CATALOG, modulesForBusiness, isEnabled, isSuggested } from "@/lib/modules";
 import { ModuleSuggestion } from "./module-card";
+import { RequestModule, type ModuleRequestRow } from "./request-module";
 import { formatGTQ } from "@/lib/format";
 import { ModeSwitcher } from "./switcher";
 import { ChatInput } from "./chat-input";
@@ -235,6 +236,16 @@ async function loadDashboard(key: string) {
     };
   });
 
+  const moduleRequests = project.business_id
+    ? await sql<ModuleRequestRow[]>`
+        select id, user_message, agent_reply, status, created_at::text
+        from module_requests
+        where business_id = ${project.business_id}
+        order by created_at desc
+        limit 5
+      `
+    : [];
+
   return {
     project,
     messages,
@@ -245,6 +256,7 @@ async function loadDashboard(key: string) {
     suggestion: firstSuggested
       ? { key: firstSuggested.key, name: firstSuggested.name, pitch: firstSuggested.pitch }
       : null,
+    moduleRequests,
   };
 }
 
@@ -274,7 +286,7 @@ export default async function DashboardPage({
     );
   }
 
-  const { project, messages, tasks, recentItems, lastCheckIn, valuation, suggestion } = data;
+  const { project, messages, tasks, recentItems, lastCheckIn, valuation, suggestion, moduleRequests } = data;
   const mode = (project.mode as Mode) ?? "construction";
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
   const slug = project.business_slug;
@@ -355,6 +367,10 @@ export default async function DashboardPage({
 
         {!valuation && suggestion && slug && (
           <ModuleSuggestion slug={slug} suggestion={suggestion} />
+        )}
+
+        {slug && (
+          <RequestModule slug={slug} recent={moduleRequests} />
         )}
 
         {tasks.length > 0 && (
