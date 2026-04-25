@@ -266,6 +266,10 @@ export async function runAgentOnEventManaged(
   let finalText = "";
   let stopReason: string | null = null;
   let turnsObserved = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
 
   const stream = await client.beta.sessions.events.stream(
     sessionId,
@@ -280,6 +284,17 @@ export async function runAgentOnEventManaged(
 
   outer: for await (const ev of stream) {
     const type = (ev as { type: string }).type;
+
+    if (type === "span.model_request_end") {
+      const usage = (ev as unknown as { model_usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } }).model_usage;
+      if (usage) {
+        inputTokens += usage.input_tokens ?? 0;
+        outputTokens += usage.output_tokens ?? 0;
+        cacheReadTokens += usage.cache_read_input_tokens ?? 0;
+        cacheCreationTokens += usage.cache_creation_input_tokens ?? 0;
+      }
+      continue;
+    }
 
     if (type === "agent.message") {
       const blocksOut = (ev as unknown as { content: Array<{ text: string }> }).content;
@@ -350,6 +365,12 @@ export async function runAgentOnEventManaged(
     messageId: sessionId,
     model,
     intent,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cache_read_input_tokens: cacheReadTokens,
+      cache_creation_input_tokens: cacheCreationTokens,
+    },
   };
 
   await sql`

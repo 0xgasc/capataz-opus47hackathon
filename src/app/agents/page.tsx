@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { asObject } from "@/lib/json";
+import { estimateCostUsd, formatUsd } from "@/lib/agent/pricing";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Capataz · agentes" };
@@ -79,11 +80,73 @@ async function loadAgents() {
   `;
   const intervalMin = Number(process.env.CRON_INTERVAL_MIN ?? 30);
   const cronEnabled = process.env.CRON_DISABLED !== "true";
-  return { businesses, runs, checkIns, intervalMin, cronEnabled };
+
+  // Aggregate token usage per (model, intent, business) across the last 24h and 7d.
+  type Bucket = {
+    runs: number;
+    input_tokens: number;
+    output_tokens: number;
+    cost_usd: number;
+  };
+  const byModel24h = new Map<string, Bucket>();
+  const byModel7d = new Map<string, Bucket>();
+  const byBusiness7d = new Map<string, Bucket>();
+  const byIntent7d = new Map<string, Bucket>();
+
+  const now = Date.now();
+  const _24h = 24 * 3600 * 1000;
+  const _7d = 7 * 24 * 3600 * 1000;
+
+  function bump(map: Map<string, Bucket>, key: string, usage: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | null, cost: number) {
+    const cur = map.get(key) ?? { runs: 0, input_tokens: 0, output_tokens: 0, cost_usd: 0 };
+    cur.runs += 1;
+    cur.input_tokens += usage?.input_tokens ?? 0;
+    cur.output_tokens += usage?.output_tokens ?? 0;
+    cur.cost_usd += cost;
+    map.set(key, cur);
+  }
+
+  for (const r of runs) {
+    const inp = asObject(r.input);
+    const out = asObject(r.output);
+    const model = (inp.model as string | undefined) ?? (out.model as string | undefined) ?? "(unknown)";
+    const intent = (inp.intent as string | undefined) ?? (out.intent as string | undefined) ?? "(unknown)";
+    const usage = (out.usage as Bucket | null | undefined) ?? null;
+    const cost = estimateCostUsd(model, usage as never);
+    const ts = new Date(r.started_at).getTime();
+    if (now - ts <= _24h) bump(byModel24h, model, usage as never, cost);
+    if (now - ts <= _7d) {
+      bump(byModel7d, model, usage as never, cost);
+      bump(byBusiness7d, r.business_slug, usage as never, cost);
+      bump(byIntent7d, intent, usage as never, cost);
+    }
+  }
+
+  return {
+    businesses,
+    runs,
+    checkIns,
+    intervalMin,
+    cronEnabled,
+    byModel24h: Array.from(byModel24h.entries()).map(([model, b]) => ({ model, ...b })),
+    byModel7d: Array.from(byModel7d.entries()).map(([model, b]) => ({ model, ...b })),
+    byBusiness7d: Array.from(byBusiness7d.entries()).map(([slug, b]) => ({ slug, ...b })),
+    byIntent7d: Array.from(byIntent7d.entries()).map(([intent, b]) => ({ intent, ...b })),
+  };
 }
 
 export default async function AgentsPage() {
-  const { businesses, runs, checkIns, intervalMin, cronEnabled } = await loadAgents();
+  const {
+    businesses,
+    runs,
+    checkIns,
+    intervalMin,
+    cronEnabled,
+    byModel24h,
+    byModel7d,
+    byBusiness7d,
+    byIntent7d,
+  } = await loadAgents();
 
   const runsByBiz = new Map<string, RunRow[]>();
   for (const r of runs) {
@@ -164,6 +227,189 @@ export default async function AgentsPage() {
             <code className="text-amber-300">/api/cron/checkins</code> que itera todos los negocios.
             Haiku 4.5 decide si vale la pena pingear o quedarse callado, considerando la hora del día.
           </p>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="text-sm uppercase tracking-wider text-zinc-400 mb-3">Tokens y costo</h2>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">
+                  Por modelo (últimas 24h)
+                </p>
+                {byModel24h.length === 0 ? (
+                  <p className="text-sm text-zinc-500">Sin actividad en 24h.</p>
+                ) : (
+                  <table className="w-full text-[12px] tabular-nums">
+                    <thead className="text-[10px] uppercase tracking-wider text-zinc-500">
+                      <tr>
+                        <th className="text-left font-normal pb-1">modelo</th>
+                        <th className="text-right font-normal pb-1">corridas</th>
+                        <th className="text-right font-normal pb-1">tokens in</th>
+                        <th className="text-right font-normal pb-1">tokens out</th>
+                        <th className="text-right font-normal pb-1">costo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60">
+                      {byModel24h
+                        .sort((a, b) => b.cost_usd - a.cost_usd)
+                        .map((b) => (
+                          <tr key={b.model} className="text-zinc-300">
+                            <td className="py-1.5 pr-2 font-mono text-[11px]">{b.model}</td>
+                            <td className="text-right">{b.runs}</td>
+                            <td className="text-right">{b.input_tokens.toLocaleString()}</td>
+                            <td className="text-right">{b.output_tokens.toLocaleString()}</td>
+                            <td className="text-right text-emerald-300">{formatUsd(b.cost_usd)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">
+                  Por modelo (7 días)
+                </p>
+                {byModel7d.length === 0 ? (
+                  <p className="text-sm text-zinc-500">Sin actividad en 7d.</p>
+                ) : (
+                  <table className="w-full text-[12px] tabular-nums">
+                    <thead className="text-[10px] uppercase tracking-wider text-zinc-500">
+                      <tr>
+                        <th className="text-left font-normal pb-1">modelo</th>
+                        <th className="text-right font-normal pb-1">corridas</th>
+                        <th className="text-right font-normal pb-1">tokens in</th>
+                        <th className="text-right font-normal pb-1">tokens out</th>
+                        <th className="text-right font-normal pb-1">costo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60">
+                      {byModel7d
+                        .sort((a, b) => b.cost_usd - a.cost_usd)
+                        .map((b) => (
+                          <tr key={b.model} className="text-zinc-300">
+                            <td className="py-1.5 pr-2 font-mono text-[11px]">{b.model}</td>
+                            <td className="text-right">{b.runs}</td>
+                            <td className="text-right">{b.input_tokens.toLocaleString()}</td>
+                            <td className="text-right">{b.output_tokens.toLocaleString()}</td>
+                            <td className="text-right text-emerald-300">{formatUsd(b.cost_usd)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5 pt-5 border-t border-zinc-800">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">
+                  Por negocio (7 días)
+                </p>
+                {byBusiness7d.length === 0 ? (
+                  <p className="text-sm text-zinc-500">Sin actividad.</p>
+                ) : (
+                  <ul className="space-y-1 text-[12px] tabular-nums">
+                    {byBusiness7d
+                      .sort((a, b) => b.cost_usd - a.cost_usd)
+                      .map((b) => (
+                        <li key={b.slug} className="flex items-center justify-between gap-2 text-zinc-300">
+                          <span className="font-mono text-[11px] truncate">{b.slug}</span>
+                          <span className="text-zinc-500 text-[10px]">
+                            {b.runs} corridas · {(b.input_tokens + b.output_tokens).toLocaleString()} tok
+                          </span>
+                          <span className="text-emerald-300">{formatUsd(b.cost_usd)}</span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">
+                  Por intención (7 días)
+                </p>
+                {byIntent7d.length === 0 ? (
+                  <p className="text-sm text-zinc-500">Sin actividad.</p>
+                ) : (
+                  <ul className="space-y-1 text-[12px] tabular-nums">
+                    {byIntent7d
+                      .sort((a, b) => b.cost_usd - a.cost_usd)
+                      .map((b) => (
+                        <li key={b.intent} className="flex items-center justify-between gap-2 text-zinc-300">
+                          <span className="font-mono text-[11px]">{b.intent}</span>
+                          <span className="text-zinc-500 text-[10px]">
+                            {b.runs} corridas
+                          </span>
+                          <span className="text-emerald-300">{formatUsd(b.cost_usd)}</span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-600 mt-3 leading-relaxed">
+              Costos calculados con tarifas públicas estimadas: Opus 4.7 $15/$75, Sonnet 4.6 $3/$15,
+              Haiku 4.5 $1/$5 por millón de tokens (in/out). Tokens cacheados se descuentan al 10%.
+            </p>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="text-sm uppercase tracking-wider text-zinc-400 mb-3">
+            Cuándo dispara cada modelo
+          </h2>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
+            <ul className="space-y-3 text-sm">
+              <li className="flex gap-3">
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border bg-emerald-950/40 text-emerald-300 border-emerald-900/60 self-start whitespace-nowrap">
+                  Opus 4.7
+                </span>
+                <div>
+                  <p className="text-zinc-100">Solo cuando construís sobre tu baseline.</p>
+                  <p className="text-[12px] text-zinc-500 mt-0.5">
+                    Onboarding (genera tu protocolo bespoke), agregar/quitar/modificar
+                    tareas, cambios de proveedores. La heurística detecta palabras clave
+                    como <code className="text-amber-300">agregá</code>,{" "}
+                    <code className="text-amber-300">marcá</code>,{" "}
+                    <code className="text-amber-300">tarea</code>,{" "}
+                    <code className="text-amber-300">protocolo</code>.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border bg-sky-950/40 text-sky-300 border-sky-900/60 self-start whitespace-nowrap">
+                  Sonnet 4.6
+                </span>
+                <div>
+                  <p className="text-zinc-100">Eventos rutinarios del día a día.</p>
+                  <p className="text-[12px] text-zinc-500 mt-0.5">
+                    Reportar una venta, una entrega, una foto de factura, una nota de voz.
+                    Procesa con el mismo set de tools que Opus, ~5x más barato y 2x más
+                    rápido.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border bg-amber-950/40 text-amber-300 border-amber-900/60 self-start whitespace-nowrap">
+                  Haiku 4.5
+                </span>
+                <div>
+                  <p className="text-zinc-100">Recordatorios proactivos del cron.</p>
+                  <p className="text-[12px] text-zinc-500 mt-0.5">
+                    Cada {intervalMin} min revisa los pendientes vencidos y la hora del día,
+                    decide si vale la pena pingearte. La mayoría de las veces se queda
+                    callado.
+                  </p>
+                </div>
+              </li>
+            </ul>
+            <p className="text-[10px] text-zinc-600 mt-4 leading-relaxed">
+              ¿Por qué? Opus razona mejor pero cuesta más. Reservarlo para los momentos que
+              cambian el baseline del negocio mantiene la economía sana
+              (~$0.05–0.15 por interacción en lugar de $0.30–0.50). Sonnet ya cubre el grueso
+              del trabajo operativo. Haiku se encarga de la vigilancia barata.
+            </p>
+          </div>
         </section>
 
         <section className="mb-6">
