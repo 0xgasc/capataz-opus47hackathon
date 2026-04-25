@@ -160,6 +160,35 @@ export const toolDefinitions: ToolDefinition[] = [
     },
   },
   {
+    name: "record_credit_change",
+    description:
+      "Anotá un cargo o pago en el ledger de fiados. Usá esto cuando el operador menciona ventas a crédito ('Don Chepe se llevó 2 cervezas que paga viernes') o cobros ('me pagó Doña Lucía Q150 de lo que debía'). Usá amount_gtq positivo para un cargo (cliente debe más), negativo para un pago (cliente debe menos). Solo usá este tool si el módulo 'cobros' está activado en el negocio — sino sugerilo primero con suggest_module.",
+    input_schema: {
+      type: "object",
+      required: ["customer_name", "kind", "amount_gtq"],
+      properties: {
+        customer_name: { type: "string", description: "Nombre del cliente. Ej: 'Don Chepe'." },
+        kind: { type: "string", enum: ["charge", "payment", "adjustment"] },
+        amount_gtq: { type: "number", description: "Cargo positivo, pago positivo (signo lo deduce el kind)." },
+        note: { type: "string", description: "Detalle corto. Ej: '2 cervezas a crédito'." },
+      },
+    },
+  },
+  {
+    name: "list_credits",
+    description:
+      "Listá todos los clientes con saldo en fiado. Útil para responder '¿quién me debe más?' o cuando el operador pregunta el ledger.",
+    input_schema: {
+      type: "object",
+      properties: {
+        only_with_balance: {
+          type: "boolean",
+          description: "Si true, solo trae cuentas con saldo > 0. Default true.",
+        },
+      },
+    },
+  },
+  {
     name: "list_modules",
     description:
       "Lee qué módulos tiene activos / sugeridos el negocio. Llamala antes de sugerir uno nuevo, para no duplicar.",
@@ -173,7 +202,10 @@ export const toolDefinitions: ToolDefinition[] = [
       type: "object",
       required: ["module_key", "reason"],
       properties: {
-        module_key: { type: "string", enum: ["valuacion", "lender_view"] },
+        module_key: {
+          type: "string",
+          enum: ["valuacion", "lender_view", "cobros", "clientes", "ventas_diarias"],
+        },
         reason: {
           type: "string",
           description: "Una oración explicando POR QUÉ ahora.",
@@ -189,7 +221,10 @@ export const toolDefinitions: ToolDefinition[] = [
       type: "object",
       required: ["module_key"],
       properties: {
-        module_key: { type: "string", enum: ["valuacion", "lender_view"] },
+        module_key: {
+          type: "string",
+          enum: ["valuacion", "lender_view", "cobros", "clientes", "ventas_diarias"],
+        },
       },
     },
   },
@@ -238,6 +273,10 @@ export async function runTool(
       return { ok: true, result: await suggestModuleTool(input, ctx) };
     case "install_module":
       return { ok: true, result: await installModuleTool(input, ctx) };
+    case "record_credit_change":
+      return { ok: true, result: await recordCreditChange(input, ctx) };
+    case "list_credits":
+      return { ok: true, result: await listCredits(input, ctx) };
     case "list_tasks":
       return { ok: true, result: await listTasks(input, ctx) };
     case "complete_task":
@@ -488,6 +527,76 @@ async function installModuleTool(input: Record<string, unknown>, ctx: ToolContex
   if (!exists || exists.baseline) return { ok: false, error: "invalid module key" };
   await setModuleStatus(ctx.businessId, key, "enabled", "agent");
   return { ok: true, enabled: key };
+}
+
+async function recordCreditChange(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { ok: false, error: "no business linked" };
+  const customer = String(input.customer_name ?? "").trim();
+  if (!customer) return { ok: false, error: "customer_name required" };
+  const kind = (String(input.kind ?? "charge") as "charge" | "payment" | "adjustment");
+  const rawAmount = Number(input.amount_gtq ?? 0);
+  if (!Number.isFinite(rawAmount) || rawAmount === 0) {
+    return { ok: false, error: "amount_gtq required and non-zero" };
+  }
+  // Normalize sign: charge & adjustment use positive delta; payment subtracts.
+  const delta = kind === "payment" ? -Math.abs(rawAmount) : Math.abs(rawAmount);
+  const note = input.note ? String(input.note) : null;
+
+  // Upsert account.
+  const accountRows = await sql<Array<{ id: string }>>`
+    insert into credit_accounts (business_id, customer_name, balance_gtq, last_event_at, updated_at)
+    values (${ctx.businessId}, ${customer}, ${delta}, now(), now())
+    on conflict (business_id, customer_name)
+    do update set
+      balance_gtq = credit_accounts.balance_gtq + ${delta},
+      last_event_at = now(),
+      updated_at = now()
+    returning id
+  `;
+  const accountId = accountRows[0].id;
+
+  await sql`
+    insert into credit_ledger (account_id, business_id, kind, amount_gtq, note, event_id)
+    values (${accountId}, ${ctx.businessId}, ${kind}, ${Math.abs(rawAmount)}, ${note}, ${ctx.eventId})
+  `;
+
+  const [updated] = await sql<Array<{ balance_gtq: string }>>`
+    select balance_gtq from credit_accounts where id = ${accountId}
+  `;
+  return {
+    customer,
+    kind,
+    delta_gtq: delta,
+    new_balance_gtq: Number(updated.balance_gtq),
+  };
+}
+
+async function listCredits(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { credits: [] };
+  const onlyWithBalance = input.only_with_balance === undefined ? true : Boolean(input.only_with_balance);
+  const rows = onlyWithBalance
+    ? await sql`
+        select customer_name, balance_gtq, last_event_at, notes
+        from credit_accounts
+        where business_id = ${ctx.businessId} and balance_gtq > 0
+        order by balance_gtq desc
+      `
+    : await sql`
+        select customer_name, balance_gtq, last_event_at, notes
+        from credit_accounts
+        where business_id = ${ctx.businessId}
+        order by balance_gtq desc
+      `;
+  return {
+    credits: rows.map((r) => ({
+      customer: r.customer_name,
+      balance_gtq: Number(r.balance_gtq),
+      last_event_at: r.last_event_at,
+      notes: r.notes,
+    })),
+    total_owed: rows.reduce((acc, r) => acc + Number(r.balance_gtq), 0),
+    customer_count: rows.length,
+  };
 }
 
 async function replyInChat(input: Record<string, unknown>, ctx: ToolContext) {

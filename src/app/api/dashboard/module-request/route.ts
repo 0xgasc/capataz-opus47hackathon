@@ -45,7 +45,10 @@ const ROUTER_TOOLS: Anthropic.Tool[] = [
       type: "object",
       required: ["module_key", "reason"],
       properties: {
-        module_key: { type: "string", enum: ["valuacion", "lender_view"] },
+        module_key: {
+          type: "string",
+          enum: ["valuacion", "lender_view", "cobros", "clientes", "ventas_diarias"],
+        },
         reason: { type: "string", description: "Por qué este módulo cubre el pedido." },
       },
     },

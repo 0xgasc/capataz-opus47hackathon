@@ -6,6 +6,7 @@ import { buildSuggestions } from "@/lib/agent/suggestions";
 import { MODULE_CATALOG, modulesForBusiness, isEnabled, isSuggested } from "@/lib/modules";
 import { ModuleSuggestion } from "./module-card";
 import { RequestModule, type ModuleRequestRow } from "./request-module";
+import { CobrosWidget } from "./cobros-widget";
 import { formatGTQ } from "@/lib/format";
 import { ModeSwitcher } from "./switcher";
 import { ChatInput } from "./chat-input";
@@ -171,6 +172,7 @@ async function loadDashboard(key: string) {
     ? await modulesForBusiness(project.business_id)
     : new Map<string, "enabled" | "suggested" | "disabled">();
   const valuationEnabled = isEnabled(moduleMap, "valuacion");
+  const cobrosEnabled = isEnabled(moduleMap, "cobros");
   const firstSuggested = MODULE_CATALOG.find(
     (m) => !m.baseline && isSuggested(moduleMap, m.key) && m.pitch.length > 0,
   );
@@ -253,6 +255,7 @@ async function loadDashboard(key: string) {
     recentItems,
     lastCheckIn: lastCheckIn[0] ?? null,
     valuation,
+    cobrosEnabled,
     suggestion: firstSuggested
       ? { key: firstSuggested.key, name: firstSuggested.name, pitch: firstSuggested.pitch }
       : null,
@@ -286,7 +289,7 @@ export default async function DashboardPage({
     );
   }
 
-  const { project, messages, tasks, recentItems, lastCheckIn, valuation, suggestion, moduleRequests } = data;
+  const { project, messages, tasks, recentItems, lastCheckIn, valuation, cobrosEnabled, suggestion, moduleRequests } = data;
   const mode = (project.mode as Mode) ?? "construction";
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
   const slug = project.business_slug;
@@ -363,6 +366,10 @@ export default async function DashboardPage({
               </div>
             </div>
           </section>
+        )}
+
+        {cobrosEnabled && project.business_id && (
+          <CobrosWidget businessId={project.business_id} />
         )}
 
         {!valuation && suggestion && slug && (

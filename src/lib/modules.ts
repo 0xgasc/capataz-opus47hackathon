@@ -7,7 +7,14 @@
 
 import { sql } from "@/lib/db";
 
-export type ModuleKey = "chat" | "protocolo" | "valuacion" | "lender_view";
+export type ModuleKey =
+  | "chat"
+  | "protocolo"
+  | "valuacion"
+  | "lender_view"
+  | "cobros"
+  | "clientes"
+  | "ventas_diarias";
 
 export type ModuleStatus = "enabled" | "suggested" | "disabled";
 
@@ -48,6 +55,30 @@ export const MODULE_CATALOG: ModuleEntry[] = [
     one_liner: "Reporte exportable de evidencia auditable.",
     pitch:
       "Si en algún momento un banco o un proveedor te pregunta 'cómo sé que tu inventario vale lo que decís', te puedo activar la Vista para prestamistas — un reporte con la traza completa de mis decisiones que pueden auditar.",
+    baseline: false,
+  },
+  {
+    key: "cobros",
+    name: "Cobros (fiados)",
+    one_liner: "Llevá las deudas de cada cliente, anotá pagos, mirá quién debe más.",
+    pitch:
+      "Si tenés clientes que pagan después, te puedo llevar el saldo de cada uno — cuánto deben, cuándo pagaron, a quién hay que recordarle.",
+    baseline: false,
+  },
+  {
+    key: "clientes",
+    name: "Clientes",
+    one_liner: "Lista de clientes recurrentes con notas y contactos.",
+    pitch:
+      "Si querés tener una libreta de tus clientes recurrentes con notas (Don Chepe paga viernes, Doña Lucía siempre pide al fiado), te la armo.",
+    baseline: false,
+  },
+  {
+    key: "ventas_diarias",
+    name: "Ventas diarias",
+    one_liner: "Resumen y gráfico simple de cuánto vendiste cada día.",
+    pitch:
+      "Si querés ver con un golpe de vista cuánto vendiste cada día y compararlo con la semana pasada, te activo el módulo de Ventas Diarias.",
     baseline: false,
   },
 ];
