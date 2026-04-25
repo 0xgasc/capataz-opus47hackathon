@@ -72,13 +72,15 @@ async function runAgentOnEventMessages(eventId: string, intent: Intent): Promise
       id: string;
       project_id: string | null;
       project_mode: string | null;
+      business_id: string | null;
       type: string;
       payload: unknown;
       created_by: string | null;
       created_at: Date | string;
     }>
   >`
-    select e.id, e.project_id, p.mode as project_mode, e.type, e.payload, e.created_by, e.created_at
+    select e.id, e.project_id, p.mode as project_mode, p.business_id,
+           e.type, e.payload, e.created_by, e.created_at
     from events e
     left join projects p on p.id = e.project_id
     where e.id = ${eventId}
@@ -105,6 +107,7 @@ async function runAgentOnEventMessages(eventId: string, intent: Intent): Promise
   const ctx: ToolContext = {
     projectId: event.project_id,
     projectMode: mode,
+    businessId: event.business_id,
     eventId: event.id,
     chatId: typeof payload.chat_id === "number" || typeof payload.chat_id === "string" ? payload.chat_id : null,
   };

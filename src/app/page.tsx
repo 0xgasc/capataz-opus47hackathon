@@ -1,29 +1,38 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
+import { getVertical } from "@/lib/agent/verticals";
 
 export const dynamic = "force-dynamic";
 
-type Mode = "construction" | "inventory" | "tiendita";
-type ModeStat = {
-  mode: Mode;
+type Vertical = "construction" | "inventory" | "tiendita";
+
+type BusinessRow = {
+  id: string;
+  slug: string;
   name: string;
+  vertical: string;
+  owner_name: string | null;
+  description: string | null;
   score: number | null;
+  task_count: number;
 };
 
-async function loadModeStats(): Promise<ModeStat[]> {
-  const rows = await sql<Array<{ mode: string; name: string; score: number | null }>>`
-    select p.mode, p.name,
-           (select score from project_scores ps where ps.project_id = p.id order by ps.computed_at desc limit 1) as score
-    from projects p
-    order by p.created_at asc
+async function loadBusinesses(): Promise<BusinessRow[]> {
+  const rows = await sql<BusinessRow[]>`
+    select b.id, b.slug, b.name, b.vertical, b.owner_name, b.description,
+           (
+             select ps.score
+             from project_scores ps
+             join projects p on p.id = ps.project_id
+             where p.business_id = b.id
+             order by ps.computed_at desc
+             limit 1
+           ) as score,
+           (select count(*)::int from tasks t where t.business_id = b.id) as task_count
+    from businesses b
+    order by b.created_at asc
   `;
-  return rows
-    .filter((r) => r.mode === "construction" || r.mode === "inventory" || r.mode === "tiendita")
-    .map((r) => ({
-      mode: r.mode as Mode,
-      name: r.name,
-      score: r.score,
-    }));
+  return rows;
 }
 
 function scoreColor(score: number | null): string {
@@ -34,37 +43,20 @@ function scoreColor(score: number | null): string {
   return "text-rose-300";
 }
 
-export default async function Landing() {
-  const stats = await loadModeStats();
-  const statByMode = new Map(stats.map((s) => [s.mode, s]));
+function verticalBadge(v: string): string {
+  return v === "construction"
+    ? "bg-amber-950/30 text-amber-300 border-amber-900/50"
+    : v === "inventory"
+    ? "bg-sky-950/30 text-sky-300 border-sky-900/50"
+    : "bg-emerald-950/30 text-emerald-300 border-emerald-900/50";
+}
 
-  const modeCopy = {
-    construction: {
-      lens: "Vertical 1 · Construcción",
-      title: "Obras",
-      scoreLabel: "Project Health",
-      desc:
-        "PM o capataz reporta entregas, cuadrillas, gastos. El agente detecta sobregastos, actividad fuera de horario, proveedores no autorizados, entregas duplicadas.",
-    },
-    inventory: {
-      lens: "Vertical 2 · Inventarios",
-      title: "Bodegas",
-      scoreLabel: "Collateral Readiness",
-      desc:
-        "Distribuidor / bodega como colateral de un préstamo. El agente detecta mermas, productos lentos, shocks de precio de mercado, sub-colateralización.",
-    },
-    tiendita: {
-      lens: "Vertical 3 · SMB",
-      title: "Tiendita",
-      scoreLabel: "Salud del Negocio",
-      desc:
-        "Doña Marta atiende sola. Mensajes cortos por WhatsApp se vuelven inventario, ventas a crédito, recordatorios de reabastecer. Sin formularios, sin Notion.",
-    },
-  } as const;
+export default async function Landing() {
+  const businesses = await loadBusinesses();
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex-1 flex flex-col">
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex-1 flex flex-col">
         <header className="mb-8 sm:mb-10">
           <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 mb-3">
             Capataz · Claude Opus 4.7
@@ -75,57 +67,13 @@ export default async function Landing() {
             prestamista puede revisar.
           </h1>
           <p className="text-zinc-400 mt-4 text-sm sm:text-base leading-relaxed max-w-2xl">
-            Capataz es el primer vertical de una plataforma para operaciones físicas:
-            construcción hoy, inventarios distribuidos mañana, cualquier activo físico donde
-            alguien reporta movimientos por WhatsApp-o-similar y nadie tiene un ERP.
-            Mismo sustrato, misma IA, dos lentes.
+            Plataforma para operaciones físicas. Cada negocio que entra tiene su propio
+            agente con memoria, su propio protocolo (tareas bespoke escritas por Opus),
+            su propio dashboard. Mismo sustrato, distinta personalidad.
           </p>
         </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-          {(["construction", "inventory", "tiendita"] as const).map((mode) => {
-            const s = statByMode.get(mode);
-            const copy = modeCopy[mode];
-            return (
-              <Link
-                key={mode}
-                href={`/dashboard/${mode}`}
-                className="group rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6 hover:border-emerald-900/70 hover:bg-zinc-900 active:bg-zinc-900 transition-colors"
-              >
-                <p className="text-[10px] uppercase tracking-[0.18em] text-emerald-400 mb-2">
-                  {copy.lens}
-                </p>
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <h2 className="text-xl font-semibold">{copy.title}</h2>
-                  <div className="text-right shrink-0">
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-500">
-                      {copy.scoreLabel}
-                    </p>
-                    <p
-                      className={`text-2xl font-semibold tabular-nums leading-none mt-0.5 ${scoreColor(
-                        s?.score ?? null,
-                      )}`}
-                    >
-                      {s?.score ?? "—"}
-                      <span className="text-[11px] text-zinc-500 ml-1">/100</span>
-                    </p>
-                  </div>
-                </div>
-                <p className="text-sm text-zinc-400 leading-relaxed mb-4 mt-3">{copy.desc}</p>
-                {s?.name && (
-                  <p className="text-[11px] text-zinc-500 mt-2 truncate">
-                    {s.name}
-                  </p>
-                )}
-                <p className="text-xs text-zinc-500 group-hover:text-zinc-300 mt-2">
-                  ir al panel →
-                </p>
-              </Link>
-            );
-          })}
-        </section>
-
-        <section className="mb-10">
+        <section className="mb-6">
           <Link
             href="/onboard"
             className="block rounded-2xl border border-dashed border-emerald-900/60 bg-emerald-950/10 hover:bg-emerald-950/20 p-5 sm:p-6 text-center transition-colors"
@@ -135,33 +83,100 @@ export default async function Landing() {
             </p>
             <p className="text-sm text-zinc-300">
               Conversación con Opus 4.7 → Capataz aprovisiona tu vertical, te asigna un agente
-              persistente, y te lleva a tu panel en menos de un minuto.
+              persistente con un protocolo bespoke, y te lleva a tu panel.
             </p>
           </Link>
+        </section>
+
+        <section className="mb-10">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-sm uppercase tracking-wider text-zinc-400">
+              Negocios activos ({businesses.length})
+            </h2>
+            <p className="text-[11px] text-zinc-500">
+              cada uno con su propio agente + protocolo
+            </p>
+          </div>
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {businesses.map((b) => {
+              const v = getVertical(b.vertical);
+              return (
+                <li key={b.id}>
+                  <Link
+                    href={`/dashboard/${b.slug}`}
+                    className="block rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-5 hover:border-emerald-900/60 hover:bg-zinc-900 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span
+                            className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${verticalBadge(
+                              b.vertical,
+                            )}`}
+                          >
+                            {v.label}
+                          </span>
+                          {b.owner_name && (
+                            <span className="text-[11px] text-zinc-500">
+                              {b.owner_name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-zinc-100 break-words">
+                          {b.name}
+                        </p>
+                        {b.description && (
+                          <p className="text-[12px] text-zinc-400 mt-1 leading-snug line-clamp-2">
+                            {b.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                          {v.scoreLabel}
+                        </p>
+                        <p
+                          className={`text-2xl font-semibold tabular-nums leading-none mt-0.5 ${scoreColor(
+                            b.score,
+                          )}`}
+                        >
+                          {b.score ?? "—"}
+                          <span className="text-[11px] text-zinc-500 ml-1">/100</span>
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-3 flex items-center gap-2">
+                      <span className="font-mono">{b.slug}</span>
+                      <span className="text-zinc-700">·</span>
+                      <span>{b.task_count} tareas en protocolo</span>
+                    </p>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-zinc-400 mb-10">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
             <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Ingesta</p>
             <p>
-              Telegram. Los capataces mandan texto, voz o foto en chapín. Groq Whisper
+              Telegram. Los operadores mandan texto, voz o foto en chapín. Groq Whisper
               transcribe, Opus 4.7 razona en multimodal nativo.
             </p>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
             <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Agente</p>
             <p>
-              Claude Managed Agents Sessions (beta). 4 tools custom:{" "}
-              <code>query_project_state</code>, <code>log_event</code>,{" "}
-              <code>flag_anomaly</code>, <code>recompute_score</code>. Sesión persistente
-              por evento — auditable.
+              Opus para onboarding y cambios de baseline; Sonnet para eventos de día a día;
+              Haiku para nudges proactivos. Cada negocio tiene su propio Managed Agent.
             </p>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
             <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Salida</p>
             <p>
-              Panel en tiempo casi real, score compuesto 0–100 con 4 componentes, y una
-              traza completa por evento — evidencia para un lender.
+              Protocolo bespoke escrito por Opus, score compuesto 0–100, traza completa de
+              cada decisión — evidencia para un lender o auditor.
             </p>
           </div>
         </section>

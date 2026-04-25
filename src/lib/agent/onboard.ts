@@ -20,8 +20,14 @@ Verticales disponibles HOY (no inventés otras):
 
 Tu proceso:
 1. Si el usuario no ha descrito su negocio o falta información clave (vertical aproximado, nombre del negocio, dueño/operador, ~5 productos o ítems iniciales), llama 'ask_clarification' con UNA pregunta corta y específica.
-2. Una vez tengas: (a) el vertical, (b) un nombre, (c) el operador, (d) 4-8 ítems iniciales con cantidad y costo aproximado, llama 'provision_business' con todo. NO preguntes por slug ni por id — vos lo derivás del nombre.
-3. Después de aprovisionar, escribe UN mensaje final corto: "Listo, ya creé tu negocio. Te llevo a tu panel." y nada más.
+2. Una vez tengas: (a) el vertical, (b) un nombre, (c) el operador, (d) 4-8 ítems iniciales con cantidad y costo aproximado, llama 'provision_business' con TODO incluyendo un protocolo bespoke (initial_tasks).
+3. El protocolo debe ser ESPECÍFICO al rubro. Ejemplos de cómo deben verse las tareas:
+   - Pizzería: "Preparar masa del día (antes de 9am)", "Verificar temperatura del horno (220°C antes del primer pedido)", "Inventario de toppings (mozzarella, pepperoni)", "Limpieza profunda del horno (domingo)".
+   - Panadería: "Encender el horno a las 4am", "Cuadrar la caja de la primera tanda", "Pedido de harina al proveedor (martes)".
+   - Salón de belleza: "Confirmar citas del día por WhatsApp", "Inventario de tintes y químicos", "Limpieza de herramientas (alcohol al 70%)".
+   - Ferretería: "Conteo cíclico de tornillería", "Cobrar facturas de contratistas pendientes".
+   NO copies el protocolo de otra industria. Pensá en este negocio en particular.
+4. Después de aprovisionar, escribe UN mensaje final corto: "Listo, ya creé tu negocio. Te llevo a tu panel." y nada más.
 
 Reglas:
 - Si el usuario es vago, no inventés datos. Pregunta.
@@ -43,10 +49,10 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "provision_business",
-    description: "Crea el negocio + proyecto + items iniciales en la base de datos. Llamar SOLO cuando tenés la información necesaria.",
+    description: "Crea el negocio + proyecto + items iniciales + protocolo (tareas recurrentes) en la base de datos. Llamar SOLO cuando tenés la información necesaria. El protocolo es BESPOKE — generalo basado en lo que sabés del rubro específico (no copies el de otra industria).",
     input_schema: {
       type: "object",
-      required: ["vertical", "name", "owner_name", "initial_items"],
+      required: ["vertical", "name", "owner_name", "initial_items", "initial_tasks"],
       properties: {
         vertical: { type: "string", enum: ["construction", "inventory", "tiendita"] },
         name: { type: "string", description: "Nombre comercial del negocio. Ej: 'Tiendita La Esquina'." },
@@ -57,6 +63,7 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
         initial_items: {
           type: "array",
           minItems: 1,
+          description: "Productos / materiales / inventario inicial. Lo que vende, fabrica o tiene en bodega.",
           items: {
             type: "object",
             required: ["description", "qty", "unit", "unit_cost_gtq"],
@@ -66,6 +73,22 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
               qty: { type: "number" },
               unit: { type: "string" },
               unit_cost_gtq: { type: "number" },
+            },
+          },
+        },
+        initial_tasks: {
+          type: "array",
+          minItems: 4,
+          maxItems: 10,
+          description: "Protocolo BESPOKE para este negocio: 4-10 tareas recurrentes específicas del rubro. Una pizzería tiene tareas DIFERENTES a una panadería o una ferretería. Pensá: ¿qué hace este operador todos los días, semanas, meses? ¿Qué pasaría si se le olvida? Sé concreto con cantidades, horas, días.",
+          items: {
+            type: "object",
+            required: ["title", "cadence"],
+            properties: {
+              title: { type: "string", description: "Título corto en español. Ej: 'Preparar masa del día'." },
+              detail: { type: "string", description: "1-2 oraciones específicas: cuándo, cuánto, cómo." },
+              cadence: { type: "string", enum: ["daily", "weekly", "monthly", "as_needed"] },
+              category: { type: "string", description: "Ej: 'cocina', 'cuentas', 'inventario', 'mantenimiento', 'seguridad'." },
             },
           },
         },
@@ -157,6 +180,21 @@ async function provisionBusiness(input: Record<string, unknown>): Promise<Onboar
     `;
   }
 
+  const tasks = Array.isArray(input.initial_tasks)
+    ? (input.initial_tasks as Array<Record<string, unknown>>)
+    : [];
+  for (const t of tasks) {
+    const title = String(t.title ?? "").trim();
+    if (!title) continue;
+    const detail = t.detail ? String(t.detail) : null;
+    const cadence = String(t.cadence ?? "as_needed");
+    const category = t.category ? String(t.category) : null;
+    await sql`
+      insert into tasks (business_id, title, detail, cadence, category)
+      values (${biz.id}, ${title}, ${detail}, ${cadence}, ${category})
+    `;
+  }
+
   await sql`
     insert into project_scores (project_id, score, components, computed_by)
     values (
@@ -188,7 +226,7 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
   for (let turn = 0; turn < 4; turn++) {
     const resp = await client.messages.create({
       model: OPUS,
-      max_tokens: 1024,
+      max_tokens: 4096,
       system: ONBOARD_PROMPT + `\n\nVerticales: ${verticalSummary}.`,
       tools: ONBOARD_TOOLS,
       messages,

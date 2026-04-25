@@ -53,6 +53,17 @@ type ScoreRow = {
   computed_by: string;
 };
 
+type TaskRow = {
+  id: string;
+  title: string;
+  detail: string | null;
+  cadence: string;
+  category: string | null;
+  status: string;
+  last_completed_at: Date | string | null;
+  due_at: Date | string | null;
+};
+
 const MODE_COPY: Record<Mode, {
   label: string;
   valueLabel: string;
@@ -94,8 +105,9 @@ const MODE_COPY: Record<Mode, {
 async function loadDashboard(key: string) {
   // Try business slug first (every onboarded tenant has one), then fall back to a
   // bare mode shortcut (legacy / seed dashboards: /dashboard/construction etc).
-  let projects = await sql<Project[]>`
-    select p.id, p.name, p.client, p.total_budget_gtq, p.start_date, p.mode
+  let projects = await sql<(Project & { business_id: string | null; business_slug: string | null })[]>`
+    select p.id, p.name, p.client, p.total_budget_gtq, p.start_date, p.mode,
+           p.business_id, b.slug as business_slug
     from projects p
     join businesses b on b.id = p.business_id
     where b.slug = ${key}
@@ -103,11 +115,13 @@ async function loadDashboard(key: string) {
     limit 1
   `;
   if (projects.length === 0) {
-    projects = await sql<Project[]>`
-      select id, name, client, total_budget_gtq, start_date, mode
-      from projects
-      where mode = ${key}
-      order by created_at asc
+    projects = await sql<(Project & { business_id: string | null; business_slug: string | null })[]>`
+      select p.id, p.name, p.client, p.total_budget_gtq, p.start_date, p.mode,
+             p.business_id, b.slug as business_slug
+      from projects p
+      left join businesses b on b.id = p.business_id
+      where p.mode = ${key}
+      order by p.created_at asc
       limit 1
     `;
   }
@@ -158,6 +172,19 @@ async function loadDashboard(key: string) {
     limit 20
   `;
 
+  const tasks = project.business_id
+    ? await sql<TaskRow[]>`
+        select id, title, detail, cadence, category, status, last_completed_at, due_at
+        from tasks
+        where business_id = ${project.business_id}
+        order by
+          case status when 'pending' then 0 when 'in_progress' then 1 when 'snoozed' then 2 when 'done' then 3 else 4 end,
+          case cadence when 'daily' then 0 when 'weekly' then 1 when 'monthly' then 2 when 'one_off' then 3 when 'as_needed' then 4 else 5 end,
+          title
+        limit 30
+      `
+    : [];
+
   const scoreRows = await sql<ScoreRow[]>`
     select score, components, computed_at, computed_by
     from project_scores
@@ -187,6 +214,7 @@ async function loadDashboard(key: string) {
     score,
     previousScore,
     history,
+    tasks,
   };
 }
 
@@ -396,7 +424,7 @@ export default async function DashboardModePage({
   const mode = data.project.mode as Mode;
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
 
-  const { project, budget, spent, total, pct, totalCommitted, totalMarket, driftGtq, driftPct, events, anomalies, score, previousScore, history } = data;
+  const { project, budget, spent, total, pct, totalCommitted, totalMarket, driftGtq, driftPct, events, anomalies, score, previousScore, history, tasks } = data;
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -504,6 +532,60 @@ export default async function DashboardModePage({
           </div>
         )}
       </header>
+
+      {tasks.length > 0 && (
+        <section className="px-4 sm:px-6 pt-5 sm:pt-6">
+          <div className="flex items-baseline justify-between gap-2 mb-3">
+            <h2 className="text-sm uppercase tracking-wider text-zinc-400">
+              Protocolo del negocio
+            </h2>
+            <span className="text-[11px] text-zinc-500">
+              bespoke · escrito por Opus durante el onboarding
+            </span>
+          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {tasks.map((t) => {
+              const isDone = t.status === "done";
+              const cadenceMap: Record<string, string> = {
+                daily: "diaria",
+                weekly: "semanal",
+                monthly: "mensual",
+                as_needed: "según necesidad",
+                one_off: "una vez",
+              };
+              return (
+                <li
+                  key={t.id}
+                  className={`rounded-lg border px-3.5 py-2.5 ${
+                    isDone
+                      ? "border-zinc-800 bg-zinc-900/40 opacity-60"
+                      : "border-zinc-800 bg-zinc-900/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-zinc-500 mb-1">
+                    <span>{cadenceMap[t.cadence] ?? t.cadence}</span>
+                    {t.category && (
+                      <>
+                        <span className="text-zinc-700">·</span>
+                        <span>{t.category}</span>
+                      </>
+                    )}
+                    {isDone && (
+                      <span className="ml-auto text-emerald-400">✓ hecho</span>
+                    )}
+                  </div>
+                  <p className={`text-sm ${isDone ? "text-zinc-400 line-through" : "text-zinc-100"}`}>
+                    {t.title}
+                  </p>
+                  {t.detail && (
+                    <p className="text-[11px] text-zinc-500 mt-1 leading-snug">{t.detail}</p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5 lg:gap-6 px-4 sm:px-6 py-5 sm:py-6">
         <div>

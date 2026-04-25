@@ -118,6 +118,47 @@ export const toolDefinitions: ToolDefinition[] = [
     input_schema: { type: "object", properties: {} },
   },
   {
+    name: "list_tasks",
+    description:
+      "Lee el protocolo del negocio: tareas recurrentes y pendientes con cadencia (daily, weekly, monthly, as_needed). Llamala si necesitas saber qué tiene pendiente el operador o si el evento sugiere completar una tarea existente.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["pending", "in_progress", "done", "snoozed", "any"] },
+      },
+    },
+  },
+  {
+    name: "complete_task",
+    description:
+      "Marca una tarea como completada (status='done', last_completed_at=now). Usá cuando el operador menciona haber hecho algo del protocolo (ej: 'ya repuse los huevos' → completar 'Revisar stock de huevos').",
+    input_schema: {
+      type: "object",
+      required: ["task_id"],
+      properties: {
+        task_id: { type: "string" },
+        note: { type: "string", description: "Nota opcional de qué se completó." },
+      },
+    },
+  },
+  {
+    name: "upsert_task",
+    description:
+      "Agrega o actualiza una tarea del protocolo. Usá si el operador pide algo nuevo recurrente ('recordame los lunes…') o si querés sugerir una tarea nueva basada en el evento.",
+    input_schema: {
+      type: "object",
+      required: ["title", "cadence"],
+      properties: {
+        task_id: { type: "string", description: "Si existe, actualiza; si omitís, crea nueva." },
+        title: { type: "string" },
+        detail: { type: "string" },
+        cadence: { type: "string", enum: ["daily", "weekly", "monthly", "as_needed", "one_off"] },
+        category: { type: "string" },
+        due_at: { type: "string", description: "ISO timestamp opcional para tareas one_off." },
+      },
+    },
+  },
+  {
     name: "reply_in_chat",
     description:
       "Send a short Spanish message back to the Telegram chat. Use sparingly — only when the operator needs immediate feedback (e.g. you flagged a serious anomaly and want to confirm). The webhook already sends 'recibido ✓' automatically; don't duplicate that.",
@@ -137,6 +178,7 @@ export const toolDefinitions: ToolDefinition[] = [
 export type ToolContext = {
   projectId: string;
   projectMode: "construction" | "inventory" | "tiendita";
+  businessId: string | null;
   eventId: string;
   chatId: number | string | null;
 };
@@ -155,6 +197,12 @@ export async function runTool(
       return { ok: true, result: await flagAnomaly(input, ctx) };
     case "recompute_score":
       return { ok: true, result: await recomputeScore(ctx) };
+    case "list_tasks":
+      return { ok: true, result: await listTasks(input, ctx) };
+    case "complete_task":
+      return { ok: true, result: await completeTask(input, ctx) };
+    case "upsert_task":
+      return { ok: true, result: await upsertTask(input, ctx) };
     case "reply_in_chat":
       return { ok: true, result: await replyInChat(input, ctx) };
     default:
@@ -315,6 +363,56 @@ async function recomputeScore(ctx: ToolContext) {
     components: result.components,
     evidence: result.evidence,
   };
+}
+
+async function listTasks(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { tasks: [], note: "no business linked" };
+  const status = String(input.status ?? "pending");
+  const rows =
+    status === "any"
+      ? await sql`select id, title, detail, cadence, category, status, last_completed_at, due_at from tasks where business_id = ${ctx.businessId} order by status, cadence, title`
+      : await sql`select id, title, detail, cadence, category, status, last_completed_at, due_at from tasks where business_id = ${ctx.businessId} and status = ${status} order by cadence, title`;
+  return { tasks: rows, count: rows.length };
+}
+
+async function completeTask(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { ok: false, error: "no business linked" };
+  const taskId = String(input.task_id ?? "");
+  if (!taskId) return { ok: false, error: "task_id required" };
+  const rows = await sql<Array<{ id: string; title: string }>>`
+    update tasks
+    set status = 'done', last_completed_at = now(), updated_at = now()
+    where id = ${taskId} and business_id = ${ctx.businessId}
+    returning id, title
+  `;
+  return rows[0] ? { completed: rows[0] } : { ok: false, error: "task not found" };
+}
+
+async function upsertTask(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { ok: false, error: "no business linked" };
+  const taskId = input.task_id ? String(input.task_id) : null;
+  const title = String(input.title ?? "");
+  const cadence = String(input.cadence ?? "as_needed");
+  const detail = input.detail ? String(input.detail) : null;
+  const category = input.category ? String(input.category) : null;
+  const dueAt = input.due_at ? String(input.due_at) : null;
+  if (!title) return { ok: false, error: "title required" };
+  if (taskId) {
+    const rows = await sql<Array<{ id: string }>>`
+      update tasks
+      set title = ${title}, detail = ${detail}, cadence = ${cadence},
+          category = ${category}, due_at = ${dueAt}, updated_at = now()
+      where id = ${taskId} and business_id = ${ctx.businessId}
+      returning id
+    `;
+    return rows[0] ? { updated: rows[0].id } : { ok: false, error: "task not found" };
+  }
+  const rows = await sql<Array<{ id: string }>>`
+    insert into tasks (business_id, title, detail, cadence, category, due_at)
+    values (${ctx.businessId}, ${title}, ${detail}, ${cadence}, ${category}, ${dueAt})
+    returning id
+  `;
+  return { created: rows[0].id };
 }
 
 async function replyInChat(input: Record<string, unknown>, ctx: ToolContext) {
