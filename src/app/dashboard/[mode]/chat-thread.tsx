@@ -27,17 +27,18 @@ function formatTime(s: string): string {
   }
 }
 
-function eventLabel(type: string): string {
+function channelLabel(type: string): string | null {
+  // Subtle channel indicator. Most are obvious in context; only show for
+  // non-text inputs where the modality matters.
   return (
     {
-      text_message: "texto",
-      dashboard_message: "desde la web",
       voice_note: "nota de voz",
       photo: "foto",
       task_completed: "tarea hecha",
-      scheduled_checkin: "check-in automático",
+      scheduled_checkin: "recordatorio de Capataz",
+      text_message: "Telegram",
     } as Record<string, string>
-  )[type] ?? type;
+  )[type] ?? null;
 }
 
 export function ChatThread({ messages }: { messages: ChatMessage[] }) {
@@ -93,14 +94,19 @@ function ConversationTurn({ m }: { m: ChatMessage }) {
 }
 
 function UserBubble({ m, subtitle }: { m: ChatMessage; subtitle?: string }) {
+  const channel = channelLabel(m.type);
+  const meta = subtitle ?? channel;
   return (
     <div className="flex justify-end">
       <div className="max-w-[85%] sm:max-w-[75%]">
         <div className="bg-emerald-900/40 text-emerald-50 border border-emerald-800/60 rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
-          {m.text || `(${eventLabel(m.type)})`}
+          {m.text || `(${channel ?? m.type})`}
         </div>
         <p className="text-[11px] text-zinc-500 mt-1 mr-1 text-right">
-          {m.who} · {subtitle ?? eventLabel(m.type)} · {formatTime(m.created_at)}
+          {m.who}
+          {meta ? ` · ${meta}` : ""}
+          {" · "}
+          {formatTime(m.created_at)}
         </p>
       </div>
     </div>

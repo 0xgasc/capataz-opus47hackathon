@@ -44,8 +44,9 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  const projects = await sql<Array<{ project_id: string; business_id: string; chat_id: string | null }>>`
-    select p.id as project_id, b.id as business_id, b.telegram_chat_id as chat_id
+  const projects = await sql<Array<{ project_id: string; business_id: string; chat_id: string | null; owner_name: string | null }>>`
+    select p.id as project_id, b.id as business_id,
+           b.telegram_chat_id as chat_id, b.owner_name
     from businesses b
     join projects p on p.business_id = b.id
     where b.slug = ${data.slug}
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "business not found" }, { status: 404 });
   }
   const ctx = projects[0];
+  const author = ctx.owner_name?.trim() || "tú";
 
   const tasks = await sql<Array<{ id: string; title: string; status: string }>>`
     select id, title, status from tasks
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
           task_title: task.title,
           source: "dashboard_click",
         })}::jsonb,
-        'web-user'
+        ${author}
       )
     `;
     return NextResponse.json({ ok: true, completed: { id: task.id, title: task.title } });
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
         task_id: task.id,
         task_title: task.title,
       })}::jsonb,
-      'web-user'
+      ${author}
     )
     returning id
   `;

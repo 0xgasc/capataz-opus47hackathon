@@ -34,10 +34,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const projects = await sql<Array<{ id: string; project_name: string; biz_name: string; chat_id: string | null }>>`
+  const projects = await sql<Array<{ id: string; project_name: string; owner_name: string | null; chat_id: string | null }>>`
     select p.id,
            p.name as project_name,
-           b.name as biz_name,
+           b.owner_name,
            b.telegram_chat_id as chat_id
     from businesses b
     join projects p on p.business_id = b.id
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "business not found" }, { status: 404 });
   }
   const project = projects[0];
+  const author = project.owner_name?.trim() || "tú";
 
   const [eventRow] = await sql<Array<{ id: string }>>`
     insert into events (project_id, type, payload, created_by)
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
         chat_id: project.chat_id ? Number(project.chat_id) : null,
         source: "dashboard",
       })}::jsonb,
-      'web-user'
+      ${author}
     )
     returning id
   `;
