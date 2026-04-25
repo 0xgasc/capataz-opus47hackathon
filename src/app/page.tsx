@@ -3,8 +3,9 @@ import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+type Mode = "construction" | "inventory" | "tiendita";
 type ModeStat = {
-  mode: "construction" | "inventory";
+  mode: Mode;
   name: string;
   score: number | null;
 };
@@ -17,9 +18,9 @@ async function loadModeStats(): Promise<ModeStat[]> {
     order by p.created_at asc
   `;
   return rows
-    .filter((r) => r.mode === "construction" || r.mode === "inventory")
+    .filter((r) => r.mode === "construction" || r.mode === "inventory" || r.mode === "tiendita")
     .map((r) => ({
-      mode: r.mode as "construction" | "inventory",
+      mode: r.mode as Mode,
       name: r.name,
       score: r.score,
     }));
@@ -39,18 +40,25 @@ export default async function Landing() {
 
   const modeCopy = {
     construction: {
-      lens: "Modo A · Operaciones",
-      title: "Construcción",
+      lens: "Vertical 1 · Construcción",
+      title: "Obras",
       scoreLabel: "Project Health",
       desc:
-        "PM observa una obra activa: entregas, cuadrillas, gastos. El agente detecta sobregastos, actividad fuera de horario, proveedores no autorizados, entregas duplicadas.",
+        "PM o capataz reporta entregas, cuadrillas, gastos. El agente detecta sobregastos, actividad fuera de horario, proveedores no autorizados, entregas duplicadas.",
     },
     inventory: {
-      lens: "Modo B · Valuación",
-      title: "Inventarios",
+      lens: "Vertical 2 · Inventarios",
+      title: "Bodegas",
       scoreLabel: "Collateral Readiness",
       desc:
         "Distribuidor / bodega como colateral de un préstamo. El agente detecta mermas, productos lentos, shocks de precio de mercado, sub-colateralización.",
+    },
+    tiendita: {
+      lens: "Vertical 3 · SMB",
+      title: "Tiendita",
+      scoreLabel: "Salud del Negocio",
+      desc:
+        "Doña Marta atiende sola. Mensajes cortos por WhatsApp se vuelven inventario, ventas a crédito, recordatorios de reabastecer. Sin formularios, sin Notion.",
     },
   } as const;
 
@@ -74,8 +82,8 @@ export default async function Landing() {
           </p>
         </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-          {(["construction", "inventory"] as const).map((mode) => {
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+          {(["construction", "inventory", "tiendita"] as const).map((mode) => {
             const s = statByMode.get(mode);
             const copy = modeCopy[mode];
             return (
@@ -115,6 +123,21 @@ export default async function Landing() {
               </Link>
             );
           })}
+        </section>
+
+        <section className="mb-10">
+          <Link
+            href="/onboard"
+            className="block rounded-2xl border border-dashed border-emerald-900/60 bg-emerald-950/10 hover:bg-emerald-950/20 p-5 sm:p-6 text-center transition-colors"
+          >
+            <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-400 mb-1">
+              + agregar un nuevo negocio
+            </p>
+            <p className="text-sm text-zinc-300">
+              Conversación con Opus 4.7 → Capataz aprovisiona tu vertical, te asigna un agente
+              persistente, y te lleva a tu panel en menos de un minuto.
+            </p>
+          </Link>
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-zinc-400 mb-10">

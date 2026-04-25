@@ -20,7 +20,8 @@ import { sql } from "@/lib/db";
 import { asObject } from "@/lib/json";
 import { downloadFile } from "@/lib/telegram";
 import { transcribeSpanish } from "@/lib/transcribe";
-import { getAnthropic, OPUS_MODEL } from "./anthropic";
+import { getAnthropic } from "./anthropic";
+import { selectModel, type Intent } from "./models";
 import { promptForMode } from "./prompt";
 import { toolDefinitions, runTool, type ToolContext } from "./tools";
 import type { AgentInput, AgentOutput } from "./runner";
@@ -29,7 +30,7 @@ const MANAGED_BETA = "managed-agents-2026-04-01";
 const MAX_TURNS = 8;
 
 let environmentIdPromise: Promise<string> | null = null;
-const agentIdByMode = new Map<string, Promise<string>>();
+const agentIdByModeAndModel = new Map<string, Promise<string>>();
 
 async function ensureEnvironment(): Promise<string> {
   if (!environmentIdPromise) {
@@ -51,16 +52,20 @@ async function ensureEnvironment(): Promise<string> {
   return environmentIdPromise;
 }
 
-async function ensureAgentForMode(mode: "construction" | "inventory"): Promise<string> {
-  const existing = agentIdByMode.get(mode);
+async function ensureAgentForMode(
+  mode: "construction" | "inventory" | "tiendita",
+  model: string,
+): Promise<string> {
+  const cacheKey = `${mode}:${model}`;
+  const existing = agentIdByModeAndModel.get(cacheKey);
   if (existing) return existing;
   const promise = (async () => {
     const client = getAnthropic();
     const agent = await client.beta.agents.create(
       {
-        name: `capataz-${mode}`,
-        description: `Capataz ${mode} agent — chapín operator, bilingual dashboard, composite health score.`,
-        model: OPUS_MODEL,
+        name: `capataz-${mode}-${model.split("-").slice(1, 3).join("-")}`,
+        description: `Capataz ${mode} agent (${model}) — chapín operator, composite health score.`,
+        model,
         system: promptForMode(mode),
         tools: toolDefinitions.map((t) => ({
           type: "custom" as const,
@@ -77,10 +82,10 @@ async function ensureAgentForMode(mode: "construction" | "inventory"): Promise<s
     );
     return agent.id;
   })().catch((err) => {
-    agentIdByMode.delete(mode);
+    agentIdByModeAndModel.delete(cacheKey);
     throw err;
   });
-  agentIdByMode.set(mode, promise);
+  agentIdByModeAndModel.set(cacheKey, promise);
   return promise;
 }
 
@@ -159,7 +164,12 @@ function normalizeImageMime(mime: string): ImageMime {
   return "image/jpeg";
 }
 
-export async function runAgentOnEventManaged(eventId: string): Promise<AgentOutput> {
+export async function runAgentOnEventManaged(
+  eventId: string,
+  options: { intent?: Intent } = {},
+): Promise<AgentOutput> {
+  const intent = options.intent ?? "routine_event";
+  const model = selectModel(intent);
   const rows = await sql<
     Array<{
       id: string;
@@ -188,8 +198,12 @@ export async function runAgentOnEventManaged(eventId: string): Promise<AgentOutp
     createdBy: event.created_by,
   };
 
-  const mode: "construction" | "inventory" =
-    event.project_mode === "inventory" ? "inventory" : "construction";
+  const mode: "construction" | "inventory" | "tiendita" =
+    event.project_mode === "inventory"
+      ? "inventory"
+      : event.project_mode === "tiendita"
+      ? "tiendita"
+      : "construction";
 
   const ctx: ToolContext = {
     projectId: event.project_id,
@@ -211,7 +225,7 @@ export async function runAgentOnEventManaged(eventId: string): Promise<AgentOutp
   const client = getAnthropic();
   const [environmentId, agentId] = await Promise.all([
     ensureEnvironment(),
-    ensureAgentForMode(mode),
+    ensureAgentForMode(mode, model),
   ]);
 
   const session = await client.beta.sessions.create(
@@ -325,6 +339,8 @@ export async function runAgentOnEventManaged(eventId: string): Promise<AgentOutp
     toolsCalled,
     stopReason,
     messageId: sessionId,
+    model,
+    intent,
   };
 
   await sql`
@@ -332,7 +348,7 @@ export async function runAgentOnEventManaged(eventId: string): Promise<AgentOutp
     values (
       ${eventId},
       'ok',
-      ${JSON.stringify({ ...input, runner: "managed_sessions", session_id: sessionId, agent_id: agentId })}::jsonb,
+      ${JSON.stringify({ ...input, runner: "managed_sessions", session_id: sessionId, agent_id: agentId, model, intent })}::jsonb,
       ${JSON.stringify(output)}::jsonb,
       now(),
       now()

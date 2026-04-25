@@ -87,6 +87,34 @@ After deploy, these should all pass:
 - [ ] Send a voice note → row with `type='voice_note'` and `payload.file_id` populated
 - [ ] Send a photo → row with `type='photo'` and `payload.file_id` + optional `caption`
 
+## Three verticals, one substrate, one factory
+
+| Vertical | Persona | Score | URL |
+|---|---|---|---|
+| `construction` | Don Beto, capataz | Project Health | `/dashboard/construction` |
+| `inventory` | Doña Marta, bodeguera | Collateral Readiness | `/dashboard/inventory` |
+| `tiendita` | Doña Marta, dueña de tienda | Salud del Negocio | `/dashboard/tiendita` |
+
+A new business is provisioned by chatting with Opus 4.7 at `/onboard` — one or two
+turns and you have a tenant + project + items + score + dashboard URL. See
+[`src/lib/agent/onboard.ts`](src/lib/agent/onboard.ts) for the provisioning tool.
+
+## Multi-model routing
+
+Opus is reserved for moments that build on the user's baseline. Routine work tiers down.
+
+| Intent | Model | Where |
+|---|---|---|
+| `onboard` | Opus 4.7 | `/onboard` chat |
+| `baseline_change` | Opus 4.7 | (reserved) |
+| `review` | Opus 4.7 | (reserved, weekly cron) |
+| `routine_event` | Sonnet 4.6 | Default Telegram event handler |
+| `nudge` | Haiku 4.5 | `POST /api/cron/checkins` |
+
+The router lives in [`src/lib/agent/models.ts`](src/lib/agent/models.ts). Every
+agent run records its model + intent in `agent_runs.input` and shows it on
+`/runs/:eventId`.
+
 ## Two modes, one substrate
 
 Capataz is the first vertical of a platform thesis: **an agent-oracle for physical

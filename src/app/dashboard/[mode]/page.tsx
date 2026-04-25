@@ -8,7 +8,7 @@ import { AutoRefresh } from "../refresh";
 
 export const dynamic = "force-dynamic";
 
-type Mode = "construction" | "inventory";
+type Mode = "construction" | "inventory" | "tiendita";
 
 type Project = {
   id: string;
@@ -79,6 +79,15 @@ const MODE_COPY: Record<Mode, {
     portfolioLabel: "Portafolio (mercado vs. costo base)",
     driftLabel: "revaluación",
     emptyEvents: "Aún no hay movimientos registrados.",
+  },
+  tiendita: {
+    label: "Tiendita",
+    valueLabel: "Valor del stock",
+    timelineLabel: "Lo que pasó hoy",
+    scoreLabel: "Salud del Negocio",
+    portfolioLabel: "Stock por categoría",
+    driftLabel: "vs. costo",
+    emptyEvents: "Mandale un mensaje a Doña Marta para arrancar el día.",
   },
 };
 
@@ -358,7 +367,7 @@ export default async function DashboardModePage({
   params: Promise<{ mode: string }>;
 }) {
   const { mode: modeSlug } = await params;
-  if (modeSlug !== "construction" && modeSlug !== "inventory") notFound();
+  if (modeSlug !== "construction" && modeSlug !== "inventory" && modeSlug !== "tiendita") notFound();
   const mode = modeSlug as Mode;
   const copy = MODE_COPY[mode];
   const data = await loadDashboard(mode);

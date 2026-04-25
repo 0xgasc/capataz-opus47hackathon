@@ -94,13 +94,27 @@ export async function POST(req: NextRequest) {
   }
 
   const modeParam = req.nextUrl.searchParams.get("mode");
-  const targetMode: "construction" | "inventory" =
-    modeParam === "inventory" ? "inventory" : "construction";
+  const slugParam = req.nextUrl.searchParams.get("business");
+  const targetMode: "construction" | "inventory" | "tiendita" =
+    modeParam === "inventory"
+      ? "inventory"
+      : modeParam === "tiendita"
+      ? "tiendita"
+      : "construction";
+
+  const projectQuery = slugParam
+    ? sql`select p.id from projects p join businesses b on b.id = p.business_id where b.slug = ${slugParam} order by p.created_at asc limit 1`
+    : sql`select id from projects where mode = ${targetMode} order by created_at asc limit 1`;
+  const projectRows = await projectQuery;
+  if (projectRows.length === 0) {
+    return NextResponse.json({ ok: false, error: "no project found" }, { status: 404 });
+  }
+  const projectId = projectRows[0].id;
 
   const inserted = await sql<Array<{ id: string }>>`
     insert into events (project_id, type, payload, telegram_msg_id, created_by)
     values (
-      (select id from projects where mode = ${targetMode} order by created_at asc limit 1),
+      ${projectId},
       ${type},
       ${JSON.stringify(payload)}::jsonb,
       ${String(msg.message_id)},

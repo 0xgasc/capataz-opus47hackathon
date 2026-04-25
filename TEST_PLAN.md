@@ -105,6 +105,35 @@ demo script, I can trace it from there.
       `https://platform.claude.com/workspaces/default/sessions/<id>` — it should resolve to
       the real session you just ran.
 
+### G — Onboarding (NEW, Opus 4.7)
+
+- [ ] Open `$CAPATAZ_BASE/onboard`. Chat UI loads with greeting from Capataz.
+- [ ] Type a one-shot intake like:
+      *"Tengo una panadería 'La Espiga de Oro' en Xela. Vendo pan dulce a Q1.50 (80 unidades), pan francés Q1 (120), semitas Q3 (40), shecas Q2 (60). Soy Don Tomás."*
+- [ ] Within ~10s the assistant replies *"Listo, ya creé tu negocio. Te llevo a tu panel."* and the page redirects to `/dashboard/tiendita`.
+- [ ] The new business shows up on the landing's tiendita card if you go back.
+- [ ] If you give vague info instead, the agent asks ONE clarifying question first.
+
+### H — Tiendita scenario (NEW)
+
+- [ ] `pnpm demo:7`. Agent should log the egg-stock event AND the credit sale, then likely flag a low-stock and possibly an off-hours anomaly.
+
+### I — Memory moment (NEW, no vector DB)
+
+- [ ] `pnpm demo:8`. First event posts a delivery; second event asks *"¿llegó algo de cemento hoy?"*. Agent's second summary should explicitly recall the first event (60 sacos, Cementos del Valle, Q 8,450). Memory powered by `query_project_state`, no embeddings.
+
+### J — Proactive nudges (Haiku)
+
+- [ ] `curl -sS -X POST "$CAPATAZ_BASE/api/cron/checkins?slug=tiendita-zona-7" -H "x-admin-secret: $ADMIN_SECRET"` — Haiku reviews state, decides to nudge or skip. Returns `status: skipped` if nothing actionable; `status: fired` if a `reply_in_chat` was made.
+- [ ] Same call without `?slug=` runs across all 3 businesses.
+- [ ] Each call inserts a row in `agent_check_ins`.
+
+### K — Model tiering visible on /runs
+
+- [ ] After a routine event (demo:1), open its `/runs/:id`. The run trace should show the model + intent (e.g. `routine · sonnet`).
+- [ ] After an onboarding (test G), there's no event-level trace (it's a one-off chat) but you can confirm the panadería business exists in DB via `pnpm exec tsx scripts/verify.ts`.
+- [ ] After a cron call (test J), the synthetic event of type `scheduled_checkin` shows up in the construction/inventory/tiendita dashboard with a `nudge · haiku` model badge.
+
 ### F — Voice note path (optional, needs you to record one)
 
 Skip if you're not demoing voice. Otherwise:

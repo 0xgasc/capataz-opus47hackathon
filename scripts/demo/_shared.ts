@@ -4,7 +4,7 @@
 
 import postgres from "postgres";
 
-export type Mode = "construction" | "inventory";
+export type Mode = "construction" | "inventory" | "tiendita";
 
 export function parseArgs() {
   const args = process.argv.slice(2);
@@ -30,7 +30,8 @@ export async function postUpdate(opts: {
   webhookSecret?: string;
 }) {
   const msgId = Math.floor(Date.now() / 1000);
-  const chatId = opts.mode === "inventory" ? 55555 : 12345;
+  const chatId =
+    opts.mode === "inventory" ? 55555 : opts.mode === "tiendita" ? 77777 : 12345;
   const message: Record<string, unknown> = {
     message_id: msgId,
     chat: { id: chatId },

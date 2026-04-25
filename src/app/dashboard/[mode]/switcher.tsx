@@ -1,22 +1,23 @@
 import Link from "next/link";
 
-type Mode = "construction" | "inventory";
+type Mode = "construction" | "inventory" | "tiendita";
 
 const ITEMS: Array<{ mode: Mode; label: string; sub: string }> = [
   { mode: "construction", label: "Construcción", sub: "Ops" },
   { mode: "inventory",    label: "Inventario",   sub: "Valuation" },
+  { mode: "tiendita",     label: "Tiendita",     sub: "SMB" },
 ];
 
 export function ModeSwitcher({ current }: { current: Mode }) {
   return (
-    <nav className="inline-flex rounded-full border border-zinc-800 bg-zinc-900/60 p-1">
+    <nav className="inline-flex rounded-full border border-zinc-800 bg-zinc-900/60 p-1 flex-wrap">
       {ITEMS.map((item) => {
         const active = item.mode === current;
         return (
           <Link
             key={item.mode}
             href={`/dashboard/${item.mode}`}
-            className={`px-3.5 py-2 rounded-full text-xs leading-tight ${
+            className={`px-3 sm:px-3.5 py-2 rounded-full text-xs leading-tight ${
               active
                 ? "bg-emerald-900/40 text-emerald-200 border border-emerald-800"
                 : "text-zinc-400 hover:text-zinc-200 active:text-zinc-200"

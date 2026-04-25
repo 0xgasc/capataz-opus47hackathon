@@ -1,0 +1,264 @@
+// Onboarding agent — runs Opus 4.7 in a tight tool-use loop:
+//   - ask_clarification: agent needs more from user, returns a question
+//   - provision_business: agent has enough to create a tenant. Inserts business + project +
+//     starter budget items + bumps a baseline score, and returns the new dashboard slug.
+//
+// Designed as a stateless POST per turn so the client can keep its own message history.
+
+import type Anthropic from "@anthropic-ai/sdk";
+import { sql } from "@/lib/db";
+import { getAnthropic } from "./anthropic";
+import { OPUS } from "./models";
+import { listVerticals } from "./verticals";
+
+const ONBOARD_PROMPT = `Eres el agente de onboarding de Capataz. Tu trabajo es escuchar a alguien describir su negocio en español (informal, voseo, chapín si vienen de Guatemala) y aprovisionarles un agente operacional bespoke.
+
+Verticales disponibles HOY (no inventés otras):
+- construction: obras, gerentes de proyecto, capataces.
+- inventory: bodegas distribuidoras, dueños que tienen inventario como colateral.
+- tiendita: tiendas de barrio, dueños que venden al menudeo.
+
+Tu proceso:
+1. Si el usuario no ha descrito su negocio o falta información clave (vertical aproximado, nombre del negocio, dueño/operador, ~5 productos o ítems iniciales), llama 'ask_clarification' con UNA pregunta corta y específica.
+2. Una vez tengas: (a) el vertical, (b) un nombre, (c) el operador, (d) 4-8 ítems iniciales con cantidad y costo aproximado, llama 'provision_business' con todo. NO preguntes por slug ni por id — vos lo derivás del nombre.
+3. Después de aprovisionar, escribe UN mensaje final corto: "Listo, ya creé tu negocio. Te llevo a tu panel." y nada más.
+
+Reglas:
+- Si el usuario es vago, no inventés datos. Pregunta.
+- Si el usuario menciona un vertical que no existe, sugierí el más cercano.
+- Tono cálido, breve. Voseo guatemalteco. Sin corporativismo.
+- Máximo 3 ask_clarification antes de aprovisionar con lo que tengas y notas explícitas en initial_items.descripcion sobre lo que faltó.`;
+
+const ONBOARD_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "ask_clarification",
+    description: "Hacele al usuario UNA pregunta corta para obtener información que falta para aprovisionar el negocio.",
+    input_schema: {
+      type: "object",
+      required: ["question"],
+      properties: {
+        question: { type: "string", description: "La pregunta en español, voseo." },
+      },
+    },
+  },
+  {
+    name: "provision_business",
+    description: "Crea el negocio + proyecto + items iniciales en la base de datos. Llamar SOLO cuando tenés la información necesaria.",
+    input_schema: {
+      type: "object",
+      required: ["vertical", "name", "owner_name", "initial_items"],
+      properties: {
+        vertical: { type: "string", enum: ["construction", "inventory", "tiendita"] },
+        name: { type: "string", description: "Nombre comercial del negocio. Ej: 'Tiendita La Esquina'." },
+        owner_name: { type: "string", description: "Nombre del operador. Ej: 'Doña Lucía'." },
+        owner_email: { type: "string", description: "Opcional. Email del dueño." },
+        telegram_chat_id: { type: "string", description: "Opcional. ID de chat de Telegram." },
+        description: { type: "string", description: "Una oración describiendo el negocio." },
+        initial_items: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            required: ["description", "qty", "unit", "unit_cost_gtq"],
+            properties: {
+              category: { type: "string" },
+              description: { type: "string" },
+              qty: { type: "number" },
+              unit: { type: "string" },
+              unit_cost_gtq: { type: "number" },
+            },
+          },
+        },
+      },
+    },
+  },
+];
+
+export type OnboardTurnInput = {
+  history: Array<{ role: "user" | "assistant"; content: string }>;
+  message: string;
+};
+
+export type OnboardTurnOutput = {
+  reply: string;
+  done: boolean;
+  redirect?: string;
+  business?: { id: string; slug: string; vertical: string; name: string };
+  toolsCalled: Array<{ name: string; input: unknown }>;
+};
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 48) || `negocio-${Date.now().toString(36)}`;
+}
+
+async function uniqueSlug(base: string): Promise<string> {
+  let candidate = base;
+  let i = 1;
+  while (true) {
+    const existing = await sql`select id from businesses where slug = ${candidate}`;
+    if (existing.length === 0) return candidate;
+    i++;
+    candidate = `${base}-${i}`;
+  }
+}
+
+async function provisionBusiness(input: Record<string, unknown>): Promise<OnboardTurnOutput["business"]> {
+  const vertical = String(input.vertical ?? "tiendita") as "construction" | "inventory" | "tiendita";
+  const name = String(input.name ?? "Negocio sin nombre");
+  const ownerName = input.owner_name ? String(input.owner_name) : null;
+  const ownerEmail = input.owner_email ? String(input.owner_email) : null;
+  const chatId = input.telegram_chat_id ? String(input.telegram_chat_id) : null;
+  const description = input.description ? String(input.description) : null;
+  const items = Array.isArray(input.initial_items) ? (input.initial_items as Array<Record<string, unknown>>) : [];
+
+  const slug = await uniqueSlug(slugify(name));
+
+  const [biz] = await sql<Array<{ id: string }>>`
+    insert into businesses (slug, name, vertical, owner_name, owner_email, telegram_chat_id, description)
+    values (${slug}, ${name}, ${vertical}, ${ownerName}, ${ownerEmail}, ${chatId}, ${description})
+    returning id
+  `;
+
+  const totalBudget = items.reduce((acc, it) => {
+    const qty = Number(it.qty ?? 0);
+    const cost = Number(it.unit_cost_gtq ?? 0);
+    return acc + qty * cost;
+  }, 0);
+
+  const [proj] = await sql<Array<{ id: string }>>`
+    insert into projects (name, client, total_budget_gtq, start_date, mode, business_id)
+    values (
+      ${name + " — operación"},
+      ${ownerName},
+      ${totalBudget || 0},
+      current_date,
+      ${vertical},
+      ${biz.id}
+    )
+    returning id
+  `;
+
+  for (const it of items) {
+    const category = String(it.category ?? "otros");
+    const description = String(it.description ?? "");
+    const qty = Number(it.qty ?? 0);
+    const unit = String(it.unit ?? "unidad");
+    const unitCost = Number(it.unit_cost_gtq ?? 0);
+    if (!description) continue;
+    await sql`
+      insert into budget_items (project_id, category, description, qty, unit, unit_cost_gtq)
+      values (${proj.id}, ${category}, ${description}, ${qty}, ${unit}, ${unitCost})
+    `;
+  }
+
+  await sql`
+    insert into project_scores (project_id, score, components, computed_by)
+    values (
+      ${proj.id},
+      80,
+      '{"budget_variance": 25, "market_drift": 25, "anomaly_rate": 25, "activity_freshness": 5}'::jsonb,
+      'onboard'
+    )
+  `;
+
+  return { id: biz.id, slug, vertical, name };
+}
+
+export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTurnOutput> {
+  const client = getAnthropic();
+  const verticalSummary = listVerticals()
+    .map((v) => `${v.vertical} (${v.label})`)
+    .join(", ");
+
+  const messages: Anthropic.MessageParam[] = [
+    ...input.history.map((m) => ({ role: m.role, content: m.content }) as Anthropic.MessageParam),
+    { role: "user", content: input.message },
+  ];
+
+  const toolsCalled: OnboardTurnOutput["toolsCalled"] = [];
+  let assistantText = "";
+  let business: OnboardTurnOutput["business"] | undefined;
+
+  for (let turn = 0; turn < 4; turn++) {
+    const resp = await client.messages.create({
+      model: OPUS,
+      max_tokens: 1024,
+      system: ONBOARD_PROMPT + `\n\nVerticales: ${verticalSummary}.`,
+      tools: ONBOARD_TOOLS,
+      messages,
+    });
+
+    messages.push({ role: "assistant", content: resp.content });
+
+    const text = resp.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
+    if (text) assistantText = text;
+
+    if (resp.stop_reason !== "tool_use") break;
+
+    const toolUses = resp.content.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+    );
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of toolUses) {
+      const inputObj = tu.input as Record<string, unknown>;
+      toolsCalled.push({ name: tu.name, input: inputObj });
+      if (tu.name === "ask_clarification") {
+        // Surface the question as the assistant's reply and stop.
+        const q = String(inputObj.question ?? "").trim();
+        if (q) assistantText = q;
+        return { reply: assistantText, done: false, toolsCalled };
+      }
+      if (tu.name === "provision_business") {
+        try {
+          business = await provisionBusiness(inputObj);
+          results.push({
+            type: "tool_result",
+            tool_use_id: tu.id,
+            content: JSON.stringify({ ok: true, slug: business?.slug }),
+          });
+        } catch (err) {
+          results.push({
+            type: "tool_result",
+            tool_use_id: tu.id,
+            content: JSON.stringify({ ok: false, error: err instanceof Error ? err.message : String(err) }),
+            is_error: true,
+          });
+        }
+      } else {
+        results.push({
+          type: "tool_result",
+          tool_use_id: tu.id,
+          content: JSON.stringify({ error: "unknown tool" }),
+          is_error: true,
+        });
+      }
+    }
+    messages.push({ role: "user", content: results });
+  }
+
+  if (business) {
+    return {
+      reply: assistantText || `Listo, creé "${business.name}". Te llevo a tu panel.`,
+      done: true,
+      redirect: `/dashboard/${business.vertical}`,
+      business,
+      toolsCalled,
+    };
+  }
+
+  return {
+    reply: assistantText || "(sin respuesta)",
+    done: false,
+    toolsCalled,
+  };
+}

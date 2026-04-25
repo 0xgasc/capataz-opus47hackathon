@@ -136,7 +136,7 @@ export const toolDefinitions: ToolDefinition[] = [
 
 export type ToolContext = {
   projectId: string;
-  projectMode: "construction" | "inventory";
+  projectMode: "construction" | "inventory" | "tiendita";
   eventId: string;
   chatId: number | string | null;
 };

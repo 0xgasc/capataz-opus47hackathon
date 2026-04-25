@@ -8,6 +8,7 @@ async function main() {
     prepare: false,
   });
   const tables = [
+    "businesses",
     "projects",
     "budget_items",
     "suppliers",
@@ -17,11 +18,15 @@ async function main() {
     "market_feeds",
     "price_snapshots",
     "project_scores",
+    "agent_check_ins",
   ];
   for (const t of tables) {
     const [row] = await sql.unsafe(`select count(*)::int as n from ${t}`);
     console.log(`${t}: ${row.n}`);
   }
+  const businesses = await sql`select slug, vertical, owner_name from businesses order by created_at`;
+  console.log("\nbusinesses:");
+  for (const b of businesses) console.log(`  [${b.vertical}] ${b.slug} (${b.owner_name ?? "—"})`);
   const projects = await sql`select name, mode from projects order by created_at`;
   console.log("\nprojects:");
   for (const p of projects) console.log(`  [${p.mode}] ${p.name}`);

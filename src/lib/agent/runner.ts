@@ -12,7 +12,8 @@ import { sql } from "@/lib/db";
 import { asObject } from "@/lib/json";
 import { downloadFile } from "@/lib/telegram";
 import { transcribeSpanish } from "@/lib/transcribe";
-import { getAnthropic, OPUS_MODEL } from "./anthropic";
+import { getAnthropic } from "./anthropic";
+import { selectModel, type Intent } from "./models";
 import { promptForMode } from "./prompt";
 import { toolDefinitions, runTool, type ToolContext } from "./tools";
 
@@ -31,6 +32,8 @@ export interface AgentOutput {
   stopReason: string | null;
   messageId?: string;
   usage?: { input_tokens?: number; output_tokens?: number };
+  model?: string;
+  intent?: Intent;
   error?: string;
 }
 
@@ -44,11 +47,15 @@ type UserBlock =
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
-export async function runAgentOnEvent(eventId: string): Promise<AgentOutput> {
+export async function runAgentOnEvent(
+  eventId: string,
+  options: { intent?: Intent } = {},
+): Promise<AgentOutput> {
+  const intent = options.intent ?? "routine_event";
   if (process.env.USE_MANAGED_AGENTS === "true") {
     try {
       const { runAgentOnEventManaged } = await import("./managed");
-      return await runAgentOnEventManaged(eventId);
+      return await runAgentOnEventManaged(eventId, { intent });
     } catch (err) {
       console.error(
         "[agent] managed-sessions path failed, falling back to messages+tools:",
@@ -56,10 +63,10 @@ export async function runAgentOnEvent(eventId: string): Promise<AgentOutput> {
       );
     }
   }
-  return runAgentOnEventMessages(eventId);
+  return runAgentOnEventMessages(eventId, intent);
 }
 
-async function runAgentOnEventMessages(eventId: string): Promise<AgentOutput> {
+async function runAgentOnEventMessages(eventId: string, intent: Intent): Promise<AgentOutput> {
   const rows = await sql<
     Array<{
       id: string;
@@ -88,8 +95,12 @@ async function runAgentOnEventMessages(eventId: string): Promise<AgentOutput> {
     createdBy: event.created_by,
   };
 
-  const mode: "construction" | "inventory" =
-    event.project_mode === "inventory" ? "inventory" : "construction";
+  const mode: "construction" | "inventory" | "tiendita" =
+    event.project_mode === "inventory"
+      ? "inventory"
+      : event.project_mode === "tiendita"
+      ? "tiendita"
+      : "construction";
 
   const ctx: ToolContext = {
     projectId: event.project_id,
@@ -97,6 +108,7 @@ async function runAgentOnEventMessages(eventId: string): Promise<AgentOutput> {
     eventId: event.id,
     chatId: typeof payload.chat_id === "number" || typeof payload.chat_id === "string" ? payload.chat_id : null,
   };
+  const model = selectModel(intent);
 
   if (!process.env.ANTHROPIC_API_KEY) {
     const output: AgentOutput = {
@@ -134,7 +146,7 @@ async function runAgentOnEventMessages(eventId: string): Promise<AgentOutput> {
     const anthropic = getAnthropic();
     for (let turn = 0; turn < 6; turn++) {
       const resp = await anthropic.messages.create({
-        model: OPUS_MODEL,
+        model,
         max_tokens: 1024,
         system: promptForMode(mode),
         tools: toolDefinitions as unknown as Anthropic.Tool[],
@@ -181,6 +193,8 @@ async function runAgentOnEventMessages(eventId: string): Promise<AgentOutput> {
       stopReason,
       messageId,
       usage,
+      model,
+      intent,
     };
     await persistRun(eventId, input, output, "ok");
     return output;
