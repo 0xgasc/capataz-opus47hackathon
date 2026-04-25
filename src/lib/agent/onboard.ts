@@ -14,9 +14,9 @@ import { listVerticals } from "./verticals";
 const ONBOARD_PROMPT = `Eres el agente de onboarding de Capataz. Tu trabajo es escuchar a alguien describir su negocio en español (informal, voseo, chapín si vienen de Guatemala) y aprovisionarles un agente operacional bespoke.
 
 Verticales disponibles HOY (no inventés otras):
-- construction: obras, gerentes de proyecto, capataces.
-- inventory: bodegas distribuidoras, dueños que tienen inventario como colateral.
-- tiendita: tiendas de barrio, dueños que venden al menudeo.
+- construction: obras y proyectos de construcción, gerentes de proyecto, capataces, contratistas.
+- inventory: SOLO bodegas mayoristas / distribuidoras B2B donde el inventario es colateral de un préstamo. NO uses 'inventory' para retail.
+- tiendita: cualquier negocio que vende al menudeo a clientes finales — tiendas de barrio, panaderías, pizzerías, restaurantes pequeños, salones, ferreterías chicas, farmacias de barrio. Si dudás entre 'inventory' y 'tiendita' para un negocio que vende al público, escogé 'tiendita'.
 
 Tu proceso:
 1. Si el usuario no ha descrito su negocio o falta información clave (vertical aproximado, nombre del negocio, dueño/operador, ~5 productos o ítems iniciales), llama 'ask_clarification' con UNA pregunta corta y específica.
@@ -250,7 +250,7 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
     return {
       reply: assistantText || `Listo, creé "${business.name}". Te llevo a tu panel.`,
       done: true,
-      redirect: `/dashboard/${business.vertical}`,
+      redirect: `/dashboard/${business.slug}`,
       business,
       toolsCalled,
     };

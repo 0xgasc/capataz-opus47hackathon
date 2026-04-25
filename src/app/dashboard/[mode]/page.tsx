@@ -91,14 +91,26 @@ const MODE_COPY: Record<Mode, {
   },
 };
 
-async function loadDashboard(mode: Mode) {
-  const projects = await sql<Project[]>`
-    select id, name, client, total_budget_gtq, start_date, mode
-    from projects
-    where mode = ${mode}
-    order by created_at asc
+async function loadDashboard(key: string) {
+  // Try business slug first (every onboarded tenant has one), then fall back to a
+  // bare mode shortcut (legacy / seed dashboards: /dashboard/construction etc).
+  let projects = await sql<Project[]>`
+    select p.id, p.name, p.client, p.total_budget_gtq, p.start_date, p.mode
+    from projects p
+    join businesses b on b.id = p.business_id
+    where b.slug = ${key}
+    order by p.created_at asc
     limit 1
   `;
+  if (projects.length === 0) {
+    projects = await sql<Project[]>`
+      select id, name, client, total_budget_gtq, start_date, mode
+      from projects
+      where mode = ${key}
+      order by created_at asc
+      limit 1
+    `;
+  }
   const project = projects[0];
   if (!project) return null;
 
@@ -366,24 +378,23 @@ export default async function DashboardModePage({
 }: {
   params: Promise<{ mode: string }>;
 }) {
-  const { mode: modeSlug } = await params;
-  if (modeSlug !== "construction" && modeSlug !== "inventory" && modeSlug !== "tiendita") notFound();
-  const mode = modeSlug as Mode;
-  const copy = MODE_COPY[mode];
-  const data = await loadDashboard(mode);
+  const { mode: keyParam } = await params;
+  const data = await loadDashboard(keyParam);
 
   if (!data) {
     return (
       <main className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
         <AutoRefresh />
-        <ModeSwitcher current={mode} />
         <p className="text-zinc-400 mt-6">
-          No hay proyectos en modo <code className="text-amber-300">{mode}</code>. Ejecute{" "}
-          <code className="text-amber-300">pnpm db:migrate</code>.
+          No encontré ningún negocio bajo <code className="text-amber-300">{keyParam}</code>.
+          {" "}<a href="/" className="text-emerald-300 hover:underline">Volver al inicio</a>.
         </p>
       </main>
     );
   }
+
+  const mode = data.project.mode as Mode;
+  const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
 
   const { project, budget, spent, total, pct, totalCommitted, totalMarket, driftGtq, driftPct, events, anomalies, score, previousScore, history } = data;
 
