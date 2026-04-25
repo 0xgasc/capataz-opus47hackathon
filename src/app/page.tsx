@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { getVertical } from "@/lib/agent/verticals";
+import { ThemeToggle } from "./theme-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +59,12 @@ export default async function Landing() {
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
       <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex-1 flex flex-col">
         <header className="mb-8 sm:mb-10">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 mb-3">
-            Capataz · Claude Opus 4.7
-          </p>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-400">
+              Capataz · Claude Opus 4.7
+            </p>
+            <ThemeToggle />
+          </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight tracking-tight">
             Un agente que vive dentro del grupo de Telegram del equipo, convierte notas de
             voz y fotos en estado estructurado, y emite un score auditable que un

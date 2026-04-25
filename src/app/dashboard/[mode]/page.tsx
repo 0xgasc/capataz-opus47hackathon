@@ -11,6 +11,7 @@ import { ChatInput } from "./chat-input";
 import { ChatThread, type ChatMessage } from "./chat-thread";
 import { TaskList, type TaskItem } from "./task-list";
 import { AutoRefresh } from "../refresh";
+import { ThemeToggle } from "../../theme-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -318,7 +319,10 @@ export default async function DashboardPage({
               )}
             </p>
           </div>
-          <ModeSwitcher current={mode} />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <ModeSwitcher current={mode} />
+          </div>
         </div>
       </header>
 
