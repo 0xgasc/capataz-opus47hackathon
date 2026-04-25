@@ -31,6 +31,16 @@ const MODE_COPY: Record<Mode, { label: string; greeting: string; emptyEvents: st
   },
 };
 
+function timeAgoShort(s: Date | string): string {
+  const ms = Date.now() - new Date(s).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "hace segundos";
+  if (min < 60) return `hace ${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `hace ${hr}h`;
+  return `hace ${Math.floor(hr / 24)}d`;
+}
+
 async function loadDashboard(key: string) {
   let projects = await sql<
     Array<{
@@ -143,6 +153,15 @@ async function loadDashboard(key: string) {
     limit 5
   `;
 
+  const lastCheckIn = project.business_id
+    ? await sql<Array<{ created_at: Date | string; status: string }>>`
+        select created_at, status from agent_check_ins
+        where business_id = ${project.business_id}
+        order by created_at desc
+        limit 1
+      `
+    : [];
+
   const messages: ChatMessage[] = events.map((e) => {
     const p = asObject(e.payload);
     const out = asObject(e.agent_output);
@@ -178,7 +197,13 @@ async function loadDashboard(key: string) {
     };
   });
 
-  return { project, messages, tasks, recentItems };
+  return {
+    project,
+    messages,
+    tasks,
+    recentItems,
+    lastCheckIn: lastCheckIn[0] ?? null,
+  };
 }
 
 export default async function DashboardPage({
@@ -207,7 +232,7 @@ export default async function DashboardPage({
     );
   }
 
-  const { project, messages, tasks, recentItems } = data;
+  const { project, messages, tasks, recentItems, lastCheckIn } = data;
   const mode = (project.mode as Mode) ?? "construction";
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
   const slug = project.business_slug;
@@ -238,6 +263,18 @@ export default async function DashboardPage({
             </p>
             <p className="text-[12px] text-zinc-500 truncate">
               {project.owner_name ?? "—"} · {copy.label}
+              {lastCheckIn && (
+                <>
+                  {" · "}
+                  <Link
+                    href="/agents"
+                    className="text-zinc-500 hover:text-emerald-300"
+                    title={`último check-in del cron: ${new Date(lastCheckIn.created_at).toLocaleString("es-GT")}`}
+                  >
+                    Capataz revisó {timeAgoShort(lastCheckIn.created_at)}
+                  </Link>
+                </>
+              )}
             </p>
           </div>
           <ModeSwitcher current={mode} />

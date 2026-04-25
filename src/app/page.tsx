@@ -182,7 +182,12 @@ export default async function Landing() {
         </section>
 
         <footer className="mt-auto text-[11px] text-zinc-600 border-t border-zinc-900 pt-5 flex items-center justify-between flex-wrap gap-2">
-          <span>Datos ficticios. Guatemala · GTQ. MIT-licensed open source.</span>
+          <span>
+            Datos ficticios. Guatemala · GTQ. MIT-licensed open source. ·{" "}
+            <Link href="/agents" className="text-zinc-500 hover:text-emerald-300 underline">
+              estado de los agentes
+            </Link>
+          </span>
           <span>
             Claude Opus 4.7 · Managed Agents 2026-04-01 · Railway · Next.js 16
           </span>
