@@ -103,9 +103,15 @@ async function buildUserMessage(
   type: string,
   payload: Record<string, unknown>,
 ): Promise<{ blocks: UserContentBlock[]; transcription?: AgentOutput["transcription"] }> {
-  if (type === "text_message") {
+  if (type === "text_message" || type === "dashboard_message" || type === "scheduled_checkin") {
     const text = typeof payload.text === "string" ? payload.text : "(mensaje vacío)";
-    return { blocks: [{ type: "text", text: `Mensaje: "${text}"` }] };
+    const sourceHint =
+      type === "dashboard_message"
+        ? " [origen: dashboard web]"
+        : type === "scheduled_checkin"
+        ? " [origen: cron de check-in proactivo]"
+        : "";
+    return { blocks: [{ type: "text", text: `Mensaje${sourceHint}: "${text}"` }] };
   }
 
   if (type === "voice_note") {

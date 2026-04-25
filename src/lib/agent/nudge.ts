@@ -62,7 +62,41 @@ export async function runCheckInForBusiness(businessId: string): Promise<CheckIn
     returning id
   `;
 
-  const promptText = `Es hora de un check-in proactivo. Mirá los eventos recientes y el score, y decidí si ${biz.owner_name ?? "el operador"} necesita un recordatorio o aviso. Si no hay nada urgente, NO mandes mensaje — solo respondé "todo en orden, sin mensaje".`;
+  // Find tasks that are "due" based on cadence + last_completed_at.
+  const dueTasks = await sql<
+    Array<{ id: string; title: string; detail: string | null; cadence: string; category: string | null; last_completed_at: Date | string | null }>
+  >`
+    select id, title, detail, cadence, category, last_completed_at
+    from tasks
+    where business_id = ${biz.id}
+      and status = 'pending'
+      and (
+        (cadence = 'daily'   and (last_completed_at is null or last_completed_at < now() - interval '20 hours')) or
+        (cadence = 'weekly'  and (last_completed_at is null or last_completed_at < now() - interval '6 days')) or
+        (cadence = 'monthly' and (last_completed_at is null or last_completed_at < now() - interval '28 days')) or
+        (cadence = 'one_off' and due_at is not null and due_at < now() + interval '24 hours')
+      )
+    order by
+      case cadence when 'one_off' then 0 when 'daily' then 1 when 'weekly' then 2 when 'monthly' then 3 else 4 end,
+      coalesce(last_completed_at, '1970-01-01')
+    limit 5
+  `;
+
+  const taskBullets = dueTasks.length
+    ? dueTasks
+        .map(
+          (t) =>
+            `- [${t.cadence}] ${t.title}${t.detail ? " — " + t.detail : ""}${t.last_completed_at ? " (última vez: " + new Date(t.last_completed_at).toISOString().slice(0, 10) + ")" : " (nunca completada)"}`,
+        )
+        .join("\n")
+    : "(sin tareas vencidas)";
+
+  const promptText = `Check-in proactivo para ${biz.owner_name ?? "el operador"}.
+
+Tareas del protocolo que están vencidas o por vencer:
+${taskBullets}
+
+Mirá los eventos recientes y el score con query_project_state. Decidí si ${biz.owner_name ?? "el operador"} necesita un recordatorio. Si hay una tarea importante vencida, mandale UN mensaje corto por reply_in_chat mencionando la tarea específica. Si todo está al día, NO mandes mensaje — solo respondé "todo en orden, sin mensaje".`;
 
   const [eventRow] = await sql<Array<{ id: string }>>`
     insert into events (project_id, type, payload, created_by)

@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { formatGTQ, formatDateTime } from "@/lib/format";
 import { asObject } from "@/lib/json";
 import { ModeSwitcher } from "./switcher";
+import { AgentPrompt } from "./prompt";
 import { AutoRefresh } from "../refresh";
 
 export const dynamic = "force-dynamic";
@@ -532,6 +533,10 @@ export default async function DashboardModePage({
           </div>
         )}
       </header>
+
+      {project.business_slug && (
+        <AgentPrompt slug={project.business_slug} mode={mode} />
+      )}
 
       {tasks.length > 0 && (
         <section className="px-4 sm:px-6 pt-5 sm:pt-6">
