@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { asObject } from "@/lib/json";
+import { buildSuggestions } from "@/lib/agent/suggestions";
 import { ModeSwitcher } from "./switcher";
 import { ChatInput } from "./chat-input";
 import { ChatThread, type ChatMessage } from "./chat-thread";
@@ -133,6 +134,15 @@ async function loadDashboard(key: string) {
       `
     : [];
 
+  // Sample a few items for suggestion templates ("vendí 2 cervezas").
+  const recentItems = await sql<Array<{ description: string; unit: string }>>`
+    select description, unit
+    from budget_items
+    where project_id = ${project.id} and qty > 0
+    order by random()
+    limit 5
+  `;
+
   const messages: ChatMessage[] = events.map((e) => {
     const p = asObject(e.payload);
     const out = asObject(e.agent_output);
@@ -168,7 +178,7 @@ async function loadDashboard(key: string) {
     };
   });
 
-  return { project, messages, tasks };
+  return { project, messages, tasks, recentItems };
 }
 
 export default async function DashboardPage({
@@ -197,12 +207,18 @@ export default async function DashboardPage({
     );
   }
 
-  const { project, messages, tasks } = data;
+  const { project, messages, tasks, recentItems } = data;
   const mode = (project.mode as Mode) ?? "construction";
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
   const slug = project.business_slug;
   const displayName = project.business_name ?? project.name;
-  const pendingCount = tasks.filter((t) => t.status === "pending" || t.status === "in_progress").length;
+  const pendingTasks = tasks.filter((t) => t.status === "pending" || t.status === "in_progress");
+  const pendingCount = pendingTasks.length;
+  const suggestions = buildSuggestions({
+    vertical: mode,
+    pendingTasks: pendingTasks.map((t) => ({ title: t.title })),
+    recentItems,
+  });
 
   return (
     <div className="min-h-dvh flex flex-col bg-zinc-950 text-zinc-100">
@@ -263,7 +279,7 @@ export default async function DashboardPage({
 
       {slug && (
         <div className="sticky bottom-0 z-10">
-          <ChatInput slug={slug} mode={mode} />
+          <ChatInput slug={slug} mode={mode} suggestions={suggestions} />
         </div>
       )}
     </div>
