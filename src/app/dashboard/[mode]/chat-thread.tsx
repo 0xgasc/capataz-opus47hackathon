@@ -160,7 +160,11 @@ function AgentBubble({
         </div>
         {tools.length > 0 && (
           <p className="text-[10px] text-zinc-600 mt-1 ml-1 break-all">
-            usó: {tools.join(" · ")}
+            usó: {
+              Object.entries(
+                tools.reduce<Record<string, number>>((acc, t) => ({ ...acc, [t]: (acc[t] ?? 0) + 1 }), {})
+              ).map(([t, n]) => n > 1 ? `${t} ×${n}` : t).join(" · ")
+            }
           </p>
         )}
       </div>

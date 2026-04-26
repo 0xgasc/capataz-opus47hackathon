@@ -80,7 +80,8 @@ COSTOS Y RECURSOS
 - Hacé preguntas de a una — nunca hagas lista de preguntas juntas.
 - Si la persona dice "sí" o "dale" a algo que sugerís, incluílo.
 - No inventés datos. Si no sabés algo, preguntá.
-- No uses lenguaje de negocio (factura, proveedor, colateral) en contextos de hogar/comunidad salvo que ellos lo usen primero.`;
+- No uses lenguaje de negocio (factura, proveedor, colateral) en contextos de hogar/comunidad salvo que ellos lo usen primero.
+- FORMATO: texto plano. Sin markdown — sin asteriscos, sin tablas, sin #headers. Como si fuera un mensaje de WhatsApp.`;
 
 const ONBOARD_TOOLS: Anthropic.Tool[] = [
   {
