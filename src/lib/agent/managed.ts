@@ -107,7 +107,7 @@ async function buildUserMessage(
     const text = typeof payload.text === "string" ? payload.text : "(mensaje vacío)";
     const sourceHint =
       type === "dashboard_message"
-        ? " [origen: dashboard web]"
+        ? " [origen: dashboard web · mensaje INDEPENDIENTE, no asumir duplicado]"
         : type === "scheduled_checkin"
         ? " [origen: cron de check-in proactivo]"
         : "";
@@ -129,13 +129,27 @@ async function buildUserMessage(
 
   if (type === "photo") {
     const fileId = typeof payload.file_id === "string" ? payload.file_id : null;
-    if (!fileId) return { blocks: [{ type: "text", text: "Foto sin file_id." }] };
-    const file = await downloadFile(fileId);
-    if (file.buffer.length > MAX_IMAGE_BYTES) {
+    const mediaUrl = typeof payload.media_url === "string" ? payload.media_url : null;
+    let buffer: Buffer;
+    let mime: string;
+    if (fileId) {
+      const file = await downloadFile(fileId);
+      buffer = file.buffer;
+      mime = file.mime;
+    } else if (mediaUrl) {
+      const res = await fetch(mediaUrl);
+      if (!res.ok) {
+        return { blocks: [{ type: "text", text: `No pude descargar la imagen (${res.status}).` }] };
+      }
+      const ab = await res.arrayBuffer();
+      buffer = Buffer.from(ab);
+      mime = res.headers.get("content-type") ?? "image/jpeg";
+    } else {
+      return { blocks: [{ type: "text", text: "Foto sin file_id ni media_url." }] };
+    }
+    if (buffer.length > MAX_IMAGE_BYTES) {
       return {
-        blocks: [
-          { type: "text", text: `Foto demasiado grande (${file.buffer.length} bytes).` },
-        ],
+        blocks: [{ type: "text", text: `Foto demasiado grande (${buffer.length} bytes).` }],
       };
     }
     const caption = typeof payload.caption === "string" ? payload.caption : "";
@@ -145,8 +159,8 @@ async function buildUserMessage(
           type: "image",
           source: {
             type: "base64",
-            media_type: normalizeImageMime(file.mime),
-            data: file.buffer.toString("base64"),
+            media_type: normalizeImageMime(mime),
+            data: buffer.toString("base64"),
           },
         },
         {

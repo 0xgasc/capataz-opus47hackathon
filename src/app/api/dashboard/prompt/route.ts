@@ -16,7 +16,8 @@ export const maxDuration = 120;
 
 const BodySchema = z.object({
   slug: z.string().min(1).max(80),
-  message: z.string().min(1).max(2000),
+  message: z.string().min(0).max(2000).optional().default(""),
+  image_url: z.string().url().max(500).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -51,16 +52,35 @@ export async function POST(req: NextRequest) {
   const project = projects[0];
   const author = project.owner_name?.trim() || "tú";
 
-  const [eventRow] = await sql<Array<{ id: string }>>`
-    insert into events (project_id, type, payload, created_by)
-    values (
-      ${project.id},
-      'dashboard_message',
-      ${JSON.stringify({
-        text: parsed.data.message,
+  const hasImage = !!parsed.data.image_url;
+  const messageText = parsed.data.message?.trim() ?? "";
+  if (!hasImage && !messageText) {
+    return NextResponse.json({ ok: false, error: "message or image required" }, { status: 400 });
+  }
+
+  const eventType = hasImage ? "photo" : "dashboard_message";
+  const payload = hasImage
+    ? {
+        text: messageText,
+        caption: messageText || null,
+        media_url: parsed.data.image_url,
         chat_id: project.chat_id ? Number(project.chat_id) : null,
         source: "dashboard",
-      })}::jsonb,
+      }
+    : {
+        text: messageText,
+        chat_id: project.chat_id ? Number(project.chat_id) : null,
+        source: "dashboard",
+      };
+
+  const [eventRow] = await sql<Array<{ id: string }>>`
+    insert into events (project_id, type, payload, telegram_msg_id, media_url, created_by)
+    values (
+      ${project.id},
+      ${eventType},
+      ${JSON.stringify(payload)}::jsonb,
+      null,
+      ${parsed.data.image_url ?? null},
       ${author}
     )
     returning id

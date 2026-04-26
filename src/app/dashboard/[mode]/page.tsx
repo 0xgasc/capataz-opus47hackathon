@@ -8,6 +8,7 @@ import { ModuleSuggestion } from "./module-card";
 import { RequestModule, type ModuleRequestRow } from "./request-module";
 import { CobrosWidget } from "./cobros-widget";
 import { DailySnapshot } from "./daily-snapshot";
+import { HitlCard, type HitlOpen } from "./hitl-card";
 import { formatGTQ } from "@/lib/format";
 import { ModeSwitcher } from "./switcher";
 import { ChatInput } from "./chat-input";
@@ -102,12 +103,13 @@ async function loadDashboard(key: string) {
       id: string;
       type: string;
       payload: unknown;
+      media_url: string | null;
       created_by: string | null;
       created_at: Date | string;
       agent_output: unknown;
     }>
   >`
-    select e.id, e.type, e.payload, e.created_by, e.created_at,
+    select e.id, e.type, e.payload, e.media_url, e.created_by, e.created_at,
            ar.output as agent_output
     from events e
     left join lateral (
@@ -179,6 +181,7 @@ async function loadDashboard(key: string) {
     : new Map<string, "enabled" | "suggested" | "disabled">();
   const valuationEnabled = isEnabled(moduleMap, "valuacion");
   const cobrosEnabled = isEnabled(moduleMap, "cobros");
+  const lenderViewEnabled = isEnabled(moduleMap, "lender_view");
   const firstSuggested = MODULE_CATALOG.find(
     (m) => !m.baseline && isSuggested(moduleMap, m.key) && m.pitch.length > 0,
   );
@@ -240,6 +243,9 @@ async function loadDashboard(key: string) {
       agent_summary: summary,
       agent_tools: tools,
       transcription,
+      media_url:
+        e.media_url ??
+        (typeof p.media_url === "string" ? p.media_url : null),
       anomalies: anomaliesByEvent.get(e.id) ?? [],
     };
   });
@@ -254,6 +260,16 @@ async function loadDashboard(key: string) {
       `
     : [];
 
+  const openHitl = project.business_id
+    ? await sql<HitlOpen[]>`
+        select id, question, context_summary, urgency, asked_at::text
+        from agent_hitl_requests
+        where business_id = ${project.business_id} and status = 'open'
+        order by asked_at desc
+        limit 3
+      `
+    : [];
+
   return {
     project,
     messages,
@@ -262,10 +278,12 @@ async function loadDashboard(key: string) {
     lastCheckIn: lastCheckIn[0] ?? null,
     valuation,
     cobrosEnabled,
+    lenderViewEnabled,
     suggestion: firstSuggested
       ? { key: firstSuggested.key, name: firstSuggested.name, pitch: firstSuggested.pitch }
       : null,
     moduleRequests,
+    openHitl,
   };
 }
 
@@ -295,7 +313,7 @@ export default async function DashboardPage({
     );
   }
 
-  const { project, messages, tasks, recentItems, lastCheckIn, valuation, cobrosEnabled, suggestion, moduleRequests } = data;
+  const { project, messages, tasks, recentItems, lastCheckIn, valuation, cobrosEnabled, lenderViewEnabled, suggestion, moduleRequests, openHitl } = data;
   const mode = (project.mode as Mode) ?? "construction";
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
   const slug = project.business_slug;
@@ -338,6 +356,18 @@ export default async function DashboardPage({
                   </Link>
                 </>
               )}
+              {lenderViewEnabled && (
+                <>
+                  {" · "}
+                  <Link
+                    href="/agents"
+                    className="text-amber-400 hover:text-amber-300"
+                    title="vista exportable de evidencia auditable para un prestamista o auditor"
+                  >
+                    🔒 vista del prestamista
+                  </Link>
+                </>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -355,6 +385,8 @@ export default async function DashboardPage({
             showScore={!!valuation}
           />
         )}
+
+        {slug && openHitl.map((h) => <HitlCard key={h.id} slug={slug} request={h} />)}
 
         {valuation && (
           <section className="px-4 sm:px-5 pt-4">

@@ -189,6 +189,26 @@ export const toolDefinitions: ToolDefinition[] = [
     },
   },
   {
+    name: "request_human_guidance",
+    description:
+      "PEDÍ AYUDA cuando no estés seguro de cómo proceder. Casos típicos: el operador menciona algo nuevo que tu protocolo no cubre, los datos son ambiguos y no podés decidir entre dos interpretaciones, falta información que cambia la decisión, o el contexto del rubro requiere conocimiento que no tenés. NO inventés. Es mejor pedir guía que adivinar mal. La pregunta aparece como burbuja especial en el chat; el operador responde y la próxima corrida la lee como contexto. Reservalo para casos REALES de duda — no lo uses como muletilla.",
+    input_schema: {
+      type: "object",
+      required: ["question", "context_summary"],
+      properties: {
+        question: {
+          type: "string",
+          description: "UNA pregunta concreta para el operador, en voseo, máximo 150 caracteres.",
+        },
+        context_summary: {
+          type: "string",
+          description: "Qué es lo que estás tratando de decidir y por qué necesitás más info. 1-2 oraciones.",
+        },
+        urgency: { type: "string", enum: ["low", "normal", "high"] },
+      },
+    },
+  },
+  {
     name: "list_modules",
     description:
       "Lee qué módulos tiene activos / sugeridos el negocio. Llamala antes de sugerir uno nuevo, para no duplicar.",
@@ -273,6 +293,8 @@ export async function runTool(
       return { ok: true, result: await suggestModuleTool(input, ctx) };
     case "install_module":
       return { ok: true, result: await installModuleTool(input, ctx) };
+    case "request_human_guidance":
+      return { ok: true, result: await requestHumanGuidance(input, ctx) };
     case "record_credit_change":
       return { ok: true, result: await recordCreditChange(input, ctx) };
     case "list_credits":
@@ -527,6 +549,26 @@ async function installModuleTool(input: Record<string, unknown>, ctx: ToolContex
   if (!exists || exists.baseline) return { ok: false, error: "invalid module key" };
   await setModuleStatus(ctx.businessId, key, "enabled", "agent");
   return { ok: true, enabled: key };
+}
+
+async function requestHumanGuidance(input: Record<string, unknown>, ctx: ToolContext) {
+  if (!ctx.businessId) return { ok: false, error: "no business linked" };
+  const question = String(input.question ?? "").trim();
+  const contextSummary = String(input.context_summary ?? "").trim();
+  const urgency = String(input.urgency ?? "normal");
+  if (!question) return { ok: false, error: "question required" };
+  const rows = await sql<Array<{ id: string }>>`
+    insert into agent_hitl_requests
+      (business_id, event_id, question, context_summary, urgency, asked_by_model)
+    values
+      (${ctx.businessId}, ${ctx.eventId}, ${question}, ${contextSummary}, ${urgency}, null)
+    returning id
+  `;
+  return {
+    hitl_request_id: rows[0].id,
+    status: "asked",
+    note: "Capataz dejó la pregunta para el operador en su chat.",
+  };
 }
 
 async function recordCreditChange(input: Record<string, unknown>, ctx: ToolContext) {

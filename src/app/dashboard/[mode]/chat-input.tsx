@@ -2,6 +2,45 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import * as tus from "tus-js-client";
+
+const STASH_SERVER =
+  process.env.NEXT_PUBLIC_STASH_SERVER ?? "https://stash-production-47fc.up.railway.app";
+
+type StashUpload = { url: string; id: string; size: number; contentType: string };
+
+async function uploadToStash(file: File, onProgress: (pct: number) => void): Promise<StashUpload> {
+  return new Promise((resolve, reject) => {
+    const upload = new tus.Upload(file, {
+      endpoint: `${STASH_SERVER}/tus-upload`,
+      retryDelays: [0, 1000, 3000],
+      chunkSize: 5 * 1024 * 1024,
+      metadata: { filename: file.name, filetype: file.type },
+      onError: (err) => reject(err),
+      onProgress: (sent, total) => onProgress(total > 0 ? sent / total : 0),
+      onSuccess: async () => {
+        try {
+          const uploadUrl = upload.url ?? "";
+          const uploadId = uploadUrl.split("/").pop() ?? "";
+          const res = await fetch(`${STASH_SERVER}/tus-upload/complete`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ uploadId, originalFilename: file.name }),
+          });
+          if (!res.ok) {
+            reject(new Error(`stash complete failed: ${res.status}`));
+            return;
+          }
+          const data = (await res.json()) as StashUpload;
+          resolve(data);
+        } catch (err) {
+          reject(err);
+        }
+      },
+    });
+    upload.start();
+  });
+}
 
 type SpeechRecognition = {
   lang: string;
@@ -38,7 +77,9 @@ export function ChatInput({
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [pendingImage, setPendingImage] = useState<{ file: File; url?: string; pct: number } | null>(null);
   const recRef = useRef<SpeechRecognition | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setVoiceSupported(getSpeechCtor() !== null);
@@ -87,7 +128,9 @@ export function ChatInput({
 
   async function send(text?: string) {
     const message = (text ?? input).trim();
-    if (!message || pending) return;
+    const imageUrl = pendingImage?.url;
+    if (!message && !imageUrl) return;
+    if (pending) return;
     setInput("");
     setError(null);
     setPending(true);
@@ -95,15 +138,34 @@ export function ChatInput({
       const res = await fetch("/api/dashboard/prompt", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slug, message }),
+        body: JSON.stringify({ slug, message, image_url: imageUrl }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setPendingImage(null);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setPending(false);
+    }
+  }
+
+  async function onFilePicked(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setError("solo imágenes por ahora");
+      return;
+    }
+    setError(null);
+    setPendingImage({ file, pct: 0 });
+    try {
+      const result = await uploadToStash(file, (pct) =>
+        setPendingImage((cur) => (cur && cur.file === file ? { ...cur, pct } : cur)),
+      );
+      setPendingImage({ file, url: result.url, pct: 1 });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setPendingImage(null);
     }
   }
 
@@ -122,6 +184,25 @@ export function ChatInput({
           </button>
         ))}
       </div>
+      {pendingImage && (
+        <div className="max-w-3xl mx-auto mb-2 flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs">
+          <span className="text-zinc-400 truncate flex-1">
+            📎 {pendingImage.file.name}{" "}
+            {pendingImage.url ? (
+              <span className="text-emerald-400">listo</span>
+            ) : (
+              <span className="text-amber-400">subiendo {Math.round(pendingImage.pct * 100)}%</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPendingImage(null)}
+            className="text-zinc-500 hover:text-rose-400"
+          >
+            quitar
+          </button>
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -129,6 +210,27 @@ export function ChatInput({
         }}
         className="flex items-end gap-2 max-w-3xl mx-auto"
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onFilePicked(f);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={pending || listening || !!pendingImage}
+          aria-label="subir imagen"
+          title="subir foto"
+          className="shrink-0 h-12 w-12 rounded-full flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-50 transition-colors"
+        >
+          📎
+        </button>
         {voiceSupported && (
           <button
             type="button"
@@ -161,7 +263,7 @@ export function ChatInput({
         />
         <button
           type="submit"
-          disabled={pending || !input.trim()}
+          disabled={pending || (!input.trim() && !pendingImage?.url)}
           className="rounded-full bg-emerald-700 hover:bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-500 text-white text-sm font-medium px-5 py-3 shrink-0 transition-colors"
         >
           {pending ? "…" : "enviar"}

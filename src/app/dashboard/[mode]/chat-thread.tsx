@@ -11,6 +11,7 @@ export type ChatMessage = {
   agent_summary: string | null;
   agent_tools: string[];
   transcription: string | null;
+  media_url: string | null;
   anomalies: Array<{ kind: string; severity: string; message: string | null }>;
 };
 
@@ -99,6 +100,14 @@ function UserBubble({ m, subtitle }: { m: ChatMessage; subtitle?: string }) {
   return (
     <div className="flex justify-end">
       <div className="max-w-[85%] sm:max-w-[75%]">
+        {m.media_url && m.type === "photo" && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={m.media_url}
+            alt="adjunto"
+            className="max-h-72 w-auto rounded-2xl rounded-br-md mb-1.5 border border-emerald-800/60"
+          />
+        )}
         <div className="bg-emerald-900/40 text-emerald-50 border border-emerald-800/60 rounded-2xl rounded-br-md px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
           {m.text || `(${channel ?? m.type})`}
         </div>

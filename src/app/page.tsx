@@ -68,14 +68,16 @@ export default async function Landing() {
             <ThemeToggle />
           </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight tracking-tight">
-            Un agente que vive dentro del grupo de Telegram del equipo, convierte notas de
-            voz y fotos en estado estructurado, y emite un score auditable que un
-            prestamista puede revisar.
+            Un agente que vive donde ya conversás — Telegram, WhatsApp, mensajes de voz —
+            convierte notas de voz, fotos y mensajes en estado real, y aprende qué importa
+            sin pedirte que aprendas un programa.
           </h1>
           <p className="text-zinc-400 mt-4 text-sm sm:text-base leading-relaxed max-w-2xl">
-            Plataforma para operaciones físicas. Cada negocio que entra tiene su propio
-            agente con memoria, su propio protocolo (tareas bespoke escritas por Opus),
-            su propio dashboard. Mismo sustrato, distinta personalidad.
+            Hecho para la gente que lleva operaciones desde el celular —
+            negocios chicos, hogares con personas a cargo, comunidades, voluntariados,
+            obras, bodegas, cualquier rutina importante. Cada situación tiene su propio
+            agente con memoria, su protocolo bespoke, su panel. Construido en Guatemala,
+            funciona en cualquier idioma que Opus entienda.
           </p>
         </header>
 
@@ -189,7 +191,7 @@ export default async function Landing() {
 
         <footer className="mt-auto text-[11px] text-zinc-600 border-t border-zinc-900 pt-5 flex items-center justify-between flex-wrap gap-2">
           <span>
-            Datos ficticios. Guatemala · GTQ. MIT-licensed open source. ·{" "}
+            Hecho en Guatemala · funciona en cualquier idioma · MIT open source ·{" "}
             <Link href="/agents" className="text-zinc-500 hover:text-emerald-300 underline">
               estado de los agentes
             </Link>

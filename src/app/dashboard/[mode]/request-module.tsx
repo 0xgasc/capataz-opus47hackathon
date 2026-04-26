@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -113,7 +114,14 @@ export function RequestModule({
         )}
 
         {recent.length > 0 && (
-          <ul className="mt-3 space-y-2">
+          <>
+          <div className="flex items-center justify-between mt-3 mb-1">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">solicitudes recientes</p>
+            <Link href="/admin/queue" className="text-[10px] text-zinc-500 hover:text-emerald-300 underline">
+              ver el roadmap completo →
+            </Link>
+          </div>
+          <ul className="space-y-2">
             {recent.map((r) => {
               const st = STATUS_LABEL[r.status] ?? STATUS_LABEL.queued;
               return (
@@ -136,6 +144,7 @@ export function RequestModule({
               );
             })}
           </ul>
+          </>
         )}
       </div>
     </section>
