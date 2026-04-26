@@ -39,12 +39,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Read or generate session — this ties the new business to the browser that onboarded it
+  const sessionId = req.cookies.get("cap_session")?.value ?? crypto.randomUUID();
+
   try {
     const result = await runOnboardTurn({
       message: parsed.data.message,
       history: parsed.data.history ?? [],
+      sessionId,
     });
-    return NextResponse.json({ ok: true, ...result });
+    const res = NextResponse.json({ ok: true, ...result });
+    // Reinforce the cookie (middleware may have already set it, but set again to be safe)
+    res.cookies.set("cap_session", sessionId, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 90,
+      path: "/",
+    });
+    return res;
   } catch (err) {
     console.error("[/api/onboard] failed", err);
     return NextResponse.json(

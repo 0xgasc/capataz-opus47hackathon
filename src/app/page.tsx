@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
 import { getVertical } from "@/lib/agent/verticals";
 import { ThemeToggle } from "./theme-toggle";
@@ -18,7 +19,10 @@ type BusinessRow = {
   task_count: number;
 };
 
-async function loadBusinesses(): Promise<BusinessRow[]> {
+async function loadBusinesses(): Promise<{ rows: BusinessRow[]; hasSession: boolean }> {
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get("cap_session")?.value ?? null;
+
   const rows = await sql<BusinessRow[]>`
     select b.id, b.slug, b.name, b.vertical, b.owner_name, b.description,
            (
@@ -31,9 +35,10 @@ async function loadBusinesses(): Promise<BusinessRow[]> {
            ) as score,
            (select count(*)::int from tasks t where t.business_id = b.id) as task_count
     from businesses b
+    where ${sessionId ? sql`b.session_id = ${sessionId}` : sql`b.session_id is null`}
     order by b.created_at asc
   `;
-  return rows;
+  return { rows, hasSession: !!sessionId };
 }
 
 function scoreColor(score: number | null): string {
@@ -57,7 +62,7 @@ function verticalBadge(v: string): string {
 }
 
 export default async function Landing() {
-  const businesses = await loadBusinesses();
+  const { rows: businesses } = await loadBusinesses();
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">

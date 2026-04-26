@@ -122,6 +122,7 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
 export type OnboardTurnInput = {
   history: Array<{ role: "user" | "assistant"; content: string }>;
   message: string;
+  sessionId?: string;
 };
 
 export type OnboardTurnOutput = {
@@ -154,7 +155,7 @@ async function uniqueSlug(base: string): Promise<string> {
   }
 }
 
-async function provisionBusiness(input: Record<string, unknown>): Promise<OnboardTurnOutput["business"]> {
+async function provisionBusiness(input: Record<string, unknown>, sessionId?: string): Promise<OnboardTurnOutput["business"]> {
   const vertical = String(input.vertical ?? "general") as "construction" | "inventory" | "tiendita" | "general" | "delegacion";
   const name = String(input.name ?? "Negocio sin nombre");
   const ownerName = input.owner_name ? String(input.owner_name) : null;
@@ -166,8 +167,8 @@ async function provisionBusiness(input: Record<string, unknown>): Promise<Onboar
   const slug = await uniqueSlug(slugify(name));
 
   const [biz] = await sql<Array<{ id: string }>>`
-    insert into businesses (slug, name, vertical, owner_name, owner_email, telegram_chat_id, description)
-    values (${slug}, ${name}, ${vertical}, ${ownerName}, ${ownerEmail}, ${chatId}, ${description})
+    insert into businesses (slug, name, vertical, owner_name, owner_email, telegram_chat_id, description, session_id)
+    values (${slug}, ${name}, ${vertical}, ${ownerName}, ${ownerEmail}, ${chatId}, ${description}, ${sessionId ?? null})
     returning id
   `;
 
@@ -310,7 +311,7 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
       }
       if (tu.name === "provision_business") {
         try {
-          business = await provisionBusiness(inputObj);
+          business = await provisionBusiness(inputObj, input.sessionId);
           results.push({
             type: "tool_result",
             tool_use_id: tu.id,
