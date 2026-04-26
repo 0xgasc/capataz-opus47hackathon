@@ -315,7 +315,7 @@ export default async function DashboardPage({
         <AutoRefresh />
         <div className="max-w-md">
           <p className="text-zinc-300 text-base mb-2">
-            No encontré ningún negocio con esa URL.
+            No encontré ningún espacio con esa URL.
           </p>
           <p className="text-zinc-500 text-sm">
             <Link href="/" className="text-emerald-300 hover:underline">

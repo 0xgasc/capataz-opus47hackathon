@@ -94,11 +94,11 @@ export default async function Landing() {
             className="block rounded-2xl border border-dashed border-emerald-900/60 bg-emerald-950/10 hover:bg-emerald-950/20 p-5 sm:p-6 text-center transition-colors"
           >
             <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-400 mb-1">
-              + agregar un nuevo negocio
+              + agregar una nueva situación
             </p>
             <p className="text-sm text-zinc-300">
-              Conversación con Opus 4.7 → Capataz aprovisiona tu vertical, te asigna un agente
-              persistente con un protocolo bespoke, y te lleva a tu panel.
+              Contale a Opus 4.7 qué necesitás llevar — un negocio, un hogar, un encargo, lo que sea.
+              Te arma un agente a medida y te lleva a tu panel.
             </p>
           </Link>
         </section>
@@ -106,10 +106,10 @@ export default async function Landing() {
         <section className="mb-10">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-sm uppercase tracking-wider text-zinc-400">
-              Negocios activos ({businesses.length})
+              Tus espacios ({businesses.length})
             </h2>
             <p className="text-[11px] text-zinc-500">
-              cada uno con su propio agente + protocolo
+              cada uno con su propio agente y protocolo
             </p>
           </div>
           <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
