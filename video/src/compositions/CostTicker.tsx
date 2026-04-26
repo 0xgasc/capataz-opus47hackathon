@@ -2,10 +2,10 @@ import { useCurrentFrame, useVideoConfig, interpolate, spring } from "remotion";
 import { C } from "../tokens";
 
 const STATS = [
-  { label: "por interacción", value: "$0.05", color: C.emerald, delay: 0 },
+  { label: "per interaction", value: "$0.05", color: C.emerald, delay: 0 },
   { label: "cache hit rate", value: "~99%", color: "#6366f1", delay: 20 },
-  { label: "modelos en stack", value: "3", color: C.amber, delay: 40 },
-  { label: "verticales soportados", value: "∞", color: C.emerald, delay: 60 },
+  { label: "models in stack", value: "3", color: C.amber, delay: 40 },
+  { label: "supported verticals", value: "∞", color: C.emerald, delay: 60 },
 ];
 
 function StatBlock({
@@ -116,7 +116,7 @@ export function CostTicker() {
           textTransform: "uppercase",
         }}
       >
-        Eficiencia real · Hackathon Anthropic 2026
+        Real efficiency · Anthropic Hackathon 2026
       </div>
 
       <div

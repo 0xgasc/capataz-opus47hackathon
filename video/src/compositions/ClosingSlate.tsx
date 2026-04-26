@@ -104,9 +104,9 @@ export function ClosingSlate() {
           lineHeight: 1.4,
         }}
       >
-        El agente para los cien millones
+        The agent for the hundred million
         <br />
-        que el software olvidó.
+        that software forgot.
       </div>
 
       {/* URL */}

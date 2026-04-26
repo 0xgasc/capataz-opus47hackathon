@@ -159,7 +159,7 @@ function AgentBubble({
           {text}
         </div>
         {tools.length > 0 && (
-          <p className="text-[10px] text-zinc-600 mt-1 ml-1">
+          <p className="text-[10px] text-zinc-600 mt-1 ml-1 break-all">
             usó: {tools.join(" · ")}
           </p>
         )}

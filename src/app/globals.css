@@ -8,6 +8,11 @@
 /* Default = warm light theme. The dark theme is opt-in via [data-theme="dark"]. */
 html {
   color-scheme: light;
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
 }
 html[data-theme="dark"] {
   color-scheme: dark;

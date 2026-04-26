@@ -8,9 +8,9 @@ import {
 import { C } from "../tokens";
 
 const LINES = [
-  "Cien millones de personas",
-  "llevan operaciones complejas",
-  "sin software.",
+  "One hundred million people",
+  "run complex operations",
+  "without software.",
 ];
 
 function Line({ text, startFrame }: { text: string; startFrame: number }) {

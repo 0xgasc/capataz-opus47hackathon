@@ -2,9 +2,9 @@ import { useCurrentFrame, useVideoConfig, interpolate, spring } from "remotion";
 import { C } from "../tokens";
 
 const MODELS = [
-  { name: "Opus 4.7", role: "Piensa", color: C.emerald, delay: 0 },
-  { name: "Sonnet 4.6", role: "Ejecuta", color: "#6366f1", delay: 18 },
-  { name: "Haiku 4.5", role: "Vigila", color: C.amber, delay: 36 },
+  { name: "Opus 4.7", role: "Thinks", color: C.emerald, delay: 0 },
+  { name: "Sonnet 4.6", role: "Executes", color: "#6366f1", delay: 18 },
+  { name: "Haiku 4.5", role: "Monitors", color: C.amber, delay: 36 },
 ];
 
 function ModelPill({
@@ -108,7 +108,7 @@ function CostLine() {
         letterSpacing: "0.02em",
       }}
     >
-      ~$0.05 por interacción · Open source · Cada negocio, su propio agente
+      ~$0.05 per interaction · Open source · Every business, its own agent
     </div>
   );
 }
@@ -153,7 +153,7 @@ export function MeetCapataz() {
           fontWeight: 500,
         }}
       >
-        Capataz · Arquitectura de modelos
+        Capataz · Model Architecture
       </div>
 
       <div style={{ display: "flex", gap: 32 }}>
