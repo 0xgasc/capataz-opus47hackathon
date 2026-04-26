@@ -16,7 +16,7 @@ export default function OnboardPage() {
             Contame de tu situación.
           </h1>
           <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-            Un negocio, un hogar, un encargo, una rutina — lo que sea que necesités llevar.
+            Una tiendita, un hogar, un encargo, una iglesia, una rutina — lo que sea que necesités llevar.
             Opus 4.7 te arma un agente a medida y te lleva a tu panel. Hablale suelto.
           </p>
         </header>

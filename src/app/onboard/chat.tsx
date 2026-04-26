@@ -11,7 +11,7 @@ type Msg = {
 
 const STARTER: Msg = {
   role: "assistant",
-  content: "Hola, soy Capataz. Contame qué negocio tenés y qué te gustaría que te ayude a llevar.",
+  content: "Hola, soy Capataz. Contame tu situación — qué llevás, qué te gustaría no olvidarte, qué querés tener organizado.",
 };
 
 export function OnboardChat() {
@@ -118,7 +118,7 @@ export function OnboardChat() {
               void send();
             }
           }}
-          placeholder="contame de tu negocio…"
+          placeholder="contame de tu situación…"
           rows={2}
           className="flex-1 resize-none bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-700 focus:border-emerald-700"
           disabled={pending}
