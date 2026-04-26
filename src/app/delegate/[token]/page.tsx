@@ -118,12 +118,12 @@ export default async function DelegatePage({
             <div className="flex items-center gap-2 mb-3">
               <div className="h-px flex-1 bg-zinc-800" />
               <p className="text-[10px] uppercase tracking-widest text-zinc-500 shrink-0">
-                En el pipeline
+                Protocolo
               </p>
               <div className="h-px flex-1 bg-zinc-800" />
             </div>
             <p className="text-xs text-zinc-600 mb-3 text-center">
-              Tareas recurrentes — CAPA las va a reponer automáticamente.
+              Tareas que se repiten según su cadencia. CAPA las reactiva automáticamente.
             </p>
             <ul className="space-y-2">
               {recurring.map((t) => {
