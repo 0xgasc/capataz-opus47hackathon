@@ -3,7 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  thinking?: string | null;
+};
 
 const STARTER: Msg = {
   role: "assistant",
@@ -43,7 +47,10 @@ export function OnboardChat() {
       if (!res.ok || !data.ok) {
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
-      setMessages((cur) => [...cur, { role: "assistant", content: data.reply ?? "(sin respuesta)" }]);
+      setMessages((cur) => [
+        ...cur,
+        { role: "assistant", content: data.reply ?? "(sin respuesta)", thinking: data.thinking ?? null },
+      ]);
       if (data.done && data.redirect) {
         setTimeout(() => router.push(data.redirect), 1200);
       }
@@ -62,14 +69,24 @@ export function OnboardChat() {
             key={i}
             className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
           >
-            <div
-              className={`max-w-[88%] text-sm rounded-2xl px-3.5 py-2 leading-relaxed whitespace-pre-wrap ${
-                m.role === "user"
-                  ? "bg-emerald-900/40 text-emerald-50 border border-emerald-800/60 rounded-br-md"
-                  : "bg-zinc-800/80 text-zinc-100 border border-zinc-700 rounded-bl-md"
-              }`}
-            >
-              {m.content}
+            <div className="max-w-[88%]">
+              <div
+                className={`text-sm rounded-2xl px-3.5 py-2 leading-relaxed whitespace-pre-wrap ${
+                  m.role === "user"
+                    ? "bg-emerald-900/40 text-emerald-50 border border-emerald-800/60 rounded-br-md"
+                    : "bg-zinc-800/80 text-zinc-100 border border-zinc-700 rounded-bl-md"
+                }`}
+              >
+                {m.content}
+              </div>
+              {m.thinking && (
+                <p
+                  className="mt-1.5 text-[10px] uppercase tracking-wider text-violet-400"
+                  title="Opus 4.7 ejecutó razonamiento extendido (adaptive thinking) antes de responder. Anthropic encripta el contenido."
+                >
+                  💭 razonó extendido
+                </p>
+              )}
             </div>
           </div>
         ))}

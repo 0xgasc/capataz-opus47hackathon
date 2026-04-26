@@ -127,6 +127,7 @@ export type OnboardTurnOutput = {
   redirect?: string;
   business?: { id: string; slug: string; vertical: string; name: string };
   toolsCalled: Array<{ name: string; input: unknown }>;
+  thinking?: string;
 };
 
 function slugify(name: string): string {
@@ -253,13 +254,21 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
   ];
 
   const toolsCalled: OnboardTurnOutput["toolsCalled"] = [];
+  const thinkingChunks: string[] = [];
   let assistantText = "";
   let business: OnboardTurnOutput["business"] | undefined;
 
   for (let turn = 0; turn < 4; turn++) {
     const resp = await client.messages.create({
       model: OPUS,
-      max_tokens: 4096,
+      max_tokens: 8192,
+      // Opus 4.7 uses adaptive thinking + an effort knob (not the legacy
+      // `enabled + budget_tokens` shape). Cast through unknown because the
+      // SDK type defs lag behind the new params.
+      ...({
+        thinking: { type: "adaptive" },
+        output_config: { effort: "high" },
+      } as unknown as Record<string, never>),
       system: ONBOARD_PROMPT + `\n\nVerticales: ${verticalSummary}.`,
       tools: ONBOARD_TOOLS,
       messages,
@@ -273,6 +282,13 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
       .join("\n")
       .trim();
     if (text) assistantText = text;
+
+    for (const block of resp.content) {
+      if ((block as { type: string }).type === "thinking") {
+        thinkingChunks.push("[razonamiento extendido — encriptado por Anthropic]");
+        break;
+      }
+    }
 
     if (resp.stop_reason !== "tool_use") break;
 
@@ -317,6 +333,7 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
     messages.push({ role: "user", content: results });
   }
 
+  const thinking = thinkingChunks.length > 0 ? thinkingChunks.join("\n\n") : undefined;
   if (business) {
     return {
       reply: assistantText || `Listo, creé "${business.name}". Te llevo a tu panel.`,
@@ -324,6 +341,7 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
       redirect: `/dashboard/${business.slug}`,
       business,
       toolsCalled,
+      thinking,
     };
   }
 
@@ -331,5 +349,6 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
     reply: assistantText || "(sin respuesta)",
     done: false,
     toolsCalled,
+    thinking,
   };
 }

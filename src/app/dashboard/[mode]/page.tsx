@@ -233,6 +233,8 @@ async function loadDashboard(key: string) {
     const transObj = asObject(out.transcription);
     const transcription =
       typeof transObj.text === "string" && transObj.text ? transObj.text : null;
+    const thinking =
+      typeof out.thinking === "string" && out.thinking.trim() ? out.thinking.trim() : null;
     return {
       event_id: e.id,
       type: e.type,
@@ -242,6 +244,7 @@ async function loadDashboard(key: string) {
         typeof e.created_at === "string" ? e.created_at : new Date(e.created_at).toISOString(),
       agent_summary: summary,
       agent_tools: tools,
+      agent_thinking: thinking,
       transcription,
       media_url:
         e.media_url ??

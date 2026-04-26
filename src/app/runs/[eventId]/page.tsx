@@ -223,6 +223,26 @@ export default async function RunInspectorPage({
                   </div>
                 )}
 
+                {typeof output.thinking === "string" && (output.thinking as string).trim() && (
+                  <div className="mb-4 border border-violet-900/40 bg-violet-950/10 rounded-lg p-3">
+                    <p className="text-[11px] uppercase tracking-wider text-violet-300">
+                      💭 Razonamiento extendido · Opus 4.7 adaptive
+                    </p>
+                    <p className="text-[12px] text-zinc-400 italic mt-1 leading-relaxed">
+                      Anthropic encripta el contenido del razonamiento para Opus 4.7 — solo
+                      sabemos que ocurrió, el resultado final, y los tokens consumidos.
+                      {usage.output_tokens != null && (
+                        <>
+                          {" "}
+                          <span className="text-zinc-500">
+                            ({String(usage.output_tokens)} output tokens incluyen razonamiento + texto)
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 {tools.length > 0 && (
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">

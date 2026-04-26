@@ -10,6 +10,7 @@ export type ChatMessage = {
   created_at: string;
   agent_summary: string | null;
   agent_tools: string[];
+  agent_thinking: string | null;
   transcription: string | null;
   media_url: string | null;
   anomalies: Array<{ kind: string; severity: string; message: string | null }>;
@@ -86,7 +87,13 @@ function ConversationTurn({ m }: { m: ChatMessage }) {
           subtitle="transcripción"
         />
       )}
-      {m.agent_summary && <AgentBubble text={m.agent_summary} tools={m.agent_tools} />}
+      {m.agent_summary && (
+        <AgentBubble
+          text={m.agent_summary}
+          tools={m.agent_tools}
+          thinking={m.agent_thinking}
+        />
+      )}
       {m.anomalies.map((a, i) => (
         <AnomalyBubble key={i} kind={a.kind} severity={a.severity} message={a.message} />
       ))}
@@ -122,7 +129,15 @@ function UserBubble({ m, subtitle }: { m: ChatMessage; subtitle?: string }) {
   );
 }
 
-function AgentBubble({ text, tools }: { text: string; tools: string[] }) {
+function AgentBubble({
+  text,
+  tools,
+  thinking,
+}: {
+  text: string;
+  tools: string[];
+  thinking: string | null;
+}) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[85%] sm:max-w-[75%]">
@@ -131,6 +146,14 @@ function AgentBubble({ text, tools }: { text: string; tools: string[] }) {
             C
           </span>
           <span>Capataz</span>
+          {thinking && (
+            <span
+              className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-violet-800/60 bg-violet-950/40 text-violet-300"
+              title="Opus 4.7 ejecutó razonamiento extendido (adaptive thinking) antes de actuar. El contenido del razonamiento está encriptado por Anthropic — solo el resultado y los tokens consumidos son visibles."
+            >
+              💭 razonó extendido
+            </span>
+          )}
         </div>
         <div className="bg-zinc-800/80 text-zinc-100 border border-zinc-700 rounded-2xl rounded-bl-md px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
           {text}

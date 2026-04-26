@@ -91,15 +91,25 @@ export async function POST(req: NextRequest) {
   // that change the architecture of the business itself: onboarding, installing
   // a new module, asking for design help. Detected via narrower keywords below.
   const msg = parsed.data.message.toLowerCase();
-  const moduleKeywords = [
-    "activá el módulo", "activar el módulo", "activá módulo", "activar módulo",
-    "instalá el módulo", "instalar el módulo", "instalá módulo",
-    "valuación", "valuacion", "valuá", "valuar",
-    "necesito un módulo", "necesito modulo",
-    "rediseñá", "redisenar", "rediseño", "redisenio",
+  // Trigger Opus + extended thinking for moments that change the operator's
+  // baseline: adding/removing tasks, installing modules, asking for redesign.
+  // Routine reports stay on Sonnet (cheaper, faster, no thinking overhead).
+  // Each entry is a regex matched against the (lowercased) message. Allows
+  // optional articles between verb + noun ("agregá tarea" / "agregá una tarea").
+  const baselineRegexes: RegExp[] = [
+    /activá?r? (el )?(m[óo]dulo)/,
+    /instal(á|ar)? (el )?(m[óo]dulo)/,
+    /valuaci[óo]n|valu(á|ar)/,
+    /necesito (un )?m[óo]dulo/,
+    /redise[ñn](á|a|o|ar|io)/,
+    /(agreg(á|ar?|ame)|añad(í|ir)) (una?\s+)?tarea/,
+    /(nueva|crear|cre(á|ar)) tarea/,
+    /(borr(á|ar)|elimin(á|ar)|quit(á|ar)) (la\s+)?tarea/,
+    /recordam?e/,
+    /agend(á|ame|ar)/,
   ];
-  const isModuleInstall = moduleKeywords.some((kw) => msg.includes(kw));
-  const intent = isModuleInstall ? "baseline_change" : "routine_event";
+  const isBaselineChange = baselineRegexes.some((rx) => rx.test(msg));
+  const intent = isBaselineChange ? "baseline_change" : "routine_event";
 
   try {
     const output = await runAgentOnEvent(eventRow.id, { intent });

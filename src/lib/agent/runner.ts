@@ -39,6 +39,7 @@ export interface AgentOutput {
   };
   model?: string;
   intent?: Intent;
+  thinking?: string; // Extended-thinking trace (Opus 4.7 only, intents that warrant it)
   error?: string;
 }
 
@@ -57,7 +58,11 @@ export async function runAgentOnEvent(
   options: { intent?: Intent } = {},
 ): Promise<AgentOutput> {
   const intent = options.intent ?? "routine_event";
-  if (process.env.USE_MANAGED_AGENTS === "true") {
+  // For Opus intents (architecture-changing moments), force the Messages path so
+  // we can enable extended thinking + see the chain-of-thought. Routine work
+  // stays on Managed Agents sessions for prompt-caching benefits.
+  const useThinkingPath = intent === "onboard" || intent === "baseline_change";
+  if (process.env.USE_MANAGED_AGENTS === "true" && !useThinkingPath) {
     try {
       const { runAgentOnEventManaged } = await import("./managed");
       return await runAgentOnEventManaged(eventId, { intent });
@@ -150,12 +155,26 @@ async function runAgentOnEventMessages(eventId: string, intent: Intent): Promise
     let stopReason: string | null = null;
     let messageId: string | undefined;
     let usage: AgentOutput["usage"];
+    const thinkingChunks: string[] = [];
+
+    // Extended thinking on Opus-only intents. Capataz "thinks out loud" before
+    // architecture-changing decisions, so the operator (and an auditor) can
+    // review the reasoning. Sonnet/Haiku skip this for speed/cost.
+    // Opus 4.7 uses `thinking.type=adaptive` + `output_config.effort` (not the
+    // legacy enabled+budget shape).
+    const enableThinking =
+      (intent === "onboard" || intent === "baseline_change") && model.startsWith("claude-opus");
+    const thinkingExtras = enableThinking
+      ? ({ thinking: { type: "adaptive" }, output_config: { effort: "high" } } as unknown as Record<string, never>)
+      : ({} as Record<string, never>);
+    const maxTokens = enableThinking ? 8192 : 1024;
 
     const anthropic = getAnthropic();
     for (let turn = 0; turn < 6; turn++) {
       const resp = await anthropic.messages.create({
         model,
-        max_tokens: 1024,
+        max_tokens: maxTokens,
+        ...thinkingExtras,
         system: promptForMode(mode),
         tools: toolDefinitions as unknown as Anthropic.Tool[],
         messages,
@@ -175,6 +194,16 @@ async function runAgentOnEventMessages(eventId: string, intent: Intent): Promise
       );
       if (textBlocks.length) {
         finalText = textBlocks.map((t) => t.text).join("\n").trim();
+      }
+
+      // Track that Opus DID extended-thinking on this turn. Adaptive mode encrypts
+      // the thinking content (only a signature ships); we still record that
+      // reasoning happened so the UI can surface a "💭 razonó" badge.
+      for (const block of resp.content) {
+        if ((block as { type: string }).type === "thinking") {
+          thinkingChunks.push("[razonamiento extendido — encriptado por Anthropic]");
+          break;
+        }
       }
 
       if (resp.stop_reason !== "tool_use" || toolUses.length === 0) break;
@@ -203,6 +232,7 @@ async function runAgentOnEventMessages(eventId: string, intent: Intent): Promise
       usage,
       model,
       intent,
+      thinking: thinkingChunks.length > 0 ? thinkingChunks.join("\n\n") : undefined,
     };
     await persistRun(eventId, input, output, "ok");
     return output;
