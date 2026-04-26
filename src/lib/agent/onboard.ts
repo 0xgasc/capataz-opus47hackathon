@@ -229,19 +229,27 @@ async function provisionBusiness(input: Record<string, unknown>, sessionId?: str
     )
   `;
 
-  // Seed baseline modules so the dashboard has the right surface from minute zero.
-  await sql`
-    insert into business_modules (business_id, module_key, status, enabled_at, enabled_by)
-    values
-      (${biz.id}, 'chat',        'enabled',   now(), 'onboard'),
-      (${biz.id}, 'protocolo',   'enabled',   now(), 'onboard'),
-      (${biz.id}, 'valuacion',   'suggested', null,  null),
-      (${biz.id}, 'cobros',      'suggested', null,  null),
-      (${biz.id}, 'clientes',    'suggested', null,  null),
-      (${biz.id}, 'ventas_diarias', 'suggested', null, null),
-      (${biz.id}, 'lender_view', 'suggested', null,  null)
-    on conflict (business_id, module_key) do nothing
-  `;
+  // Seed modules based on vertical — only suggest what's actually relevant.
+  const hasMoney = vertical === "tiendita" || vertical === "construction" || vertical === "inventory";
+  const hasInventory = vertical === "inventory" || vertical === "construction";
+
+  const moduleRows: Array<[string, string, string]> = [
+    [biz.id, "chat",     "enabled"],
+    [biz.id, "protocolo","enabled"],
+    ...(hasMoney     ? [[biz.id, "cobros",         "suggested"]] as Array<[string,string,string]> : []),
+    ...(hasMoney     ? [[biz.id, "clientes",        "suggested"]] as Array<[string,string,string]> : []),
+    ...(hasMoney     ? [[biz.id, "ventas_diarias",  "suggested"]] as Array<[string,string,string]> : []),
+    ...(hasInventory ? [[biz.id, "valuacion",       "suggested"]] as Array<[string,string,string]> : []),
+    ...(hasInventory ? [[biz.id, "lender_view",     "suggested"]] as Array<[string,string,string]> : []),
+  ];
+
+  for (const [bid, key, status] of moduleRows) {
+    await sql`
+      insert into business_modules (business_id, module_key, status, enabled_at, enabled_by)
+      values (${bid}, ${key}, ${status}, ${status === "enabled" ? sql`now()` : null}, ${status === "enabled" ? "onboard" : null})
+      on conflict (business_id, module_key) do nothing
+    `;
+  }
 
   return { id: biz.id, slug, vertical, name };
 }
