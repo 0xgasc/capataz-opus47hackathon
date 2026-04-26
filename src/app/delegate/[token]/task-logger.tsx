@@ -12,6 +12,7 @@ type Task = {
   detail: string | null;
   category: string | null;
   status: string;
+  evidence_required: string | null;
 };
 
 type LogState = {
@@ -81,7 +82,16 @@ function TaskCard({
     }
   }
 
+  const needsPhoto = task.evidence_required === "photo" || task.evidence_required === "any";
+  const needsNote  = task.evidence_required === "note"  || task.evidence_required === "any";
+  const evidenceSatisfied =
+    !task.evidence_required ||
+    (needsPhoto && !!state.mediaUrl) ||
+    (needsNote  && !!state.note.trim()) ||
+    (task.evidence_required === "any" && (!!state.mediaUrl || !!state.note.trim()));
+
   async function submit() {
+    if (!evidenceSatisfied) return;
     setState((s) => ({ ...s, submitting: true, error: null }));
     try {
       const res = await fetch("/api/delegate/log", {
@@ -146,6 +156,11 @@ function TaskCard({
               {task.category}
             </span>
           )}
+          {task.evidence_required && !isDone && (
+            <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-amber-400 bg-amber-950/30 border border-amber-900/40 rounded px-1.5 py-0.5">
+              {task.evidence_required === "photo" ? "📷 foto requerida" : task.evidence_required === "note" ? "✍️ nota requerida" : "📷 o nota requerida"}
+            </span>
+          )}
         </div>
 
         {!isDone && (
@@ -197,10 +212,19 @@ function TaskCard({
 
           {state.error && <p className="text-xs text-rose-400">{state.error}</p>}
 
+          {task.evidence_required && !evidenceSatisfied && (
+            <p className="text-xs text-amber-400 text-center">
+              {task.evidence_required === "photo"
+                ? "Adjuntá una foto para poder marcarla hecha"
+                : task.evidence_required === "note"
+                ? "Escribí una nota para poder marcarla hecha"
+                : "Adjuntá una foto o escribí una nota para continuar"}
+            </p>
+          )}
           <button
             onClick={submit}
-            disabled={state.submitting || state.uploading}
-            className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+            disabled={state.submitting || state.uploading || !evidenceSatisfied}
+            className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {state.submitting ? "Guardando…" : "Marcar hecha"}
           </button>

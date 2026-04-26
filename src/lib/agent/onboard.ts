@@ -109,8 +109,9 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
             properties: {
               title: { type: "string", description: "Título corto en español. Ej: 'Preparar masa del día'." },
               detail: { type: "string", description: "1-2 oraciones específicas: cuándo, cuánto, cómo." },
-              cadence: { type: "string", enum: ["daily", "weekly", "monthly", "as_needed"] },
+              cadence: { type: "string", enum: ["daily", "weekly", "monthly", "as_needed", "one_off"] },
               category: { type: "string", description: "Ej: 'cocina', 'cuentas', 'inventario', 'mantenimiento', 'seguridad'." },
+              evidence_required: { type: "string", enum: ["photo", "note", "any"], description: "Solo si la tarea requiere evidencia para marcarse hecha. 'photo' = foto obligatoria (ej: 'fotografiá el estado final', 'mandame foto de la entrega'). Omití si no se necesita evidencia." },
             },
           },
         },
@@ -213,9 +214,10 @@ async function provisionBusiness(input: Record<string, unknown>, sessionId?: str
     const detail = t.detail ? String(t.detail) : null;
     const cadence = String(t.cadence ?? "as_needed");
     const category = t.category ? String(t.category) : null;
+    const evidenceRequired = t.evidence_required ? String(t.evidence_required) : null;
     await sql`
-      insert into tasks (business_id, title, detail, cadence, category)
-      values (${biz.id}, ${title}, ${detail}, ${cadence}, ${category})
+      insert into tasks (business_id, title, detail, cadence, category, evidence_required)
+      values (${biz.id}, ${title}, ${detail}, ${cadence}, ${category}, ${evidenceRequired})
     `;
   }
 

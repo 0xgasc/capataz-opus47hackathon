@@ -10,6 +10,7 @@ type TaskRow = {
   detail: string | null;
   category: string | null;
   status: string;
+  evidence_required: string | null;
 };
 
 async function loadEncargo(token: string) {
@@ -28,7 +29,7 @@ async function loadEncargo(token: string) {
   const { business_id, business_name, owner_name, description } = rows[0];
 
   const tasks = await sql<TaskRow[]>`
-    select id, title, detail, category, status
+    select id, title, detail, category, status, evidence_required
     from tasks
     where business_id = ${business_id}
     order by

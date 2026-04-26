@@ -156,6 +156,11 @@ export const toolDefinitions: ToolDefinition[] = [
         cadence: { type: "string", enum: ["daily", "weekly", "monthly", "as_needed", "one_off"] },
         category: { type: "string" },
         due_at: { type: "string", description: "ISO timestamp opcional para tareas one_off." },
+        evidence_required: {
+          type: "string",
+          enum: ["photo", "note", "any"],
+          description: "Si la tarea requiere evidencia para marcarse hecha: 'photo' = foto obligatoria, 'note' = nota escrita obligatoria, 'any' = foto O nota. Usá esto cuando el operador pide documentación ('quiero foto', 'necesito evidencia', 'que me manden prueba'). Omitís si no se requiere evidencia.",
+        },
       },
     },
   },
@@ -498,20 +503,22 @@ async function upsertTask(input: Record<string, unknown>, ctx: ToolContext) {
   const detail = input.detail ? String(input.detail) : null;
   const category = input.category ? String(input.category) : null;
   const dueAt = input.due_at ? String(input.due_at) : null;
+  const evidenceRequired = input.evidence_required ? String(input.evidence_required) : null;
   if (!title) return { ok: false, error: "title required" };
   if (taskId) {
     const rows = await sql<Array<{ id: string }>>`
       update tasks
       set title = ${title}, detail = ${detail}, cadence = ${cadence},
-          category = ${category}, due_at = ${dueAt}, updated_at = now()
+          category = ${category}, due_at = ${dueAt},
+          evidence_required = ${evidenceRequired}, updated_at = now()
       where id = ${taskId} and business_id = ${ctx.businessId}
       returning id
     `;
     return rows[0] ? { updated: rows[0].id } : { ok: false, error: "task not found" };
   }
   const rows = await sql<Array<{ id: string }>>`
-    insert into tasks (business_id, title, detail, cadence, category, due_at)
-    values (${ctx.businessId}, ${title}, ${detail}, ${cadence}, ${category}, ${dueAt})
+    insert into tasks (business_id, title, detail, cadence, category, due_at, evidence_required)
+    values (${ctx.businessId}, ${title}, ${detail}, ${cadence}, ${category}, ${dueAt}, ${evidenceRequired})
     returning id
   `;
   return { created: rows[0].id };
