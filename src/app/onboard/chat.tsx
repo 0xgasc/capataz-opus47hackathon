@@ -11,7 +11,7 @@ type Msg = {
 
 const STARTER: Msg = {
   role: "assistant",
-  content: "Hola, soy Capataz. Contame tu situación — qué llevás, qué te gustaría no olvidarte, qué querés tener organizado.",
+  content: "Hola, soy CAPA. Contame tu situación — qué llevás, qué te gustaría no olvidarte, qué querés tener organizado.",
 };
 
 export function OnboardChat() {
