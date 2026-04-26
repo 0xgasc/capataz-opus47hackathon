@@ -67,7 +67,27 @@ COSTOS Y RECURSOS
    - Encargo limpieza: no solo "limpiar" — "Fotografiar estado inicial del área, limpiar, fotografiar estado final"
    - Iglesia: no solo "servicio" — "Confirmar que el predicador llegó antes de las 9am, si no: llamar a Pastor Mario inmediatamente"
 
-4. Para 'evidence_required' en tareas: usá 'photo' cuando sea una tarea de campo, entrega, inspección, o cualquier cosa donde el dueño querría ver prueba. Usá 'note' para reportes, conteos, observaciones. Usá 'any' si cualquier documentación alcanza.
+4. CAMPOS DE ENFORCEMENT — cada tarea tiene campos que el sistema respeta. Llenálos explícitamente:
+
+   evidence_required: SIEMPRE asignalo cuando sea una tarea que puede no cumplirse correctamente sin prueba.
+   - 'photo' → entregas físicas, inspecciones, estado antes/después, medicamentos dados, inventarios contados
+   - 'note' → reportes, conteos, observaciones verbales, confirmaciones
+   - 'any' → cualquier documentación alcanza (default para tareas de campo cuando no importa el medio)
+   - null → solo para tareas administrativas internas donde la ejecución es obvia (ej: "abrir tienda")
+
+   cadence: el sistema reinicia las tareas automáticamente según esto. Sé preciso:
+   - 'daily' → tareas que deben pasar todos los días (medicamentos, aperturas, cierres, rondas)
+   - 'weekly' → revisiones semanales, limpiezas profundas, inventarios parciales
+   - 'monthly' → mantenimientos, conteos mayores, reportes mensuales
+   - 'one_off' → entregas específicas, eventos únicos — siempre asignales 'due_at' con la fecha/hora real
+   - 'as_needed' → solo si genuinamente no tiene frecuencia definida
+
+   due_at: para tareas one_off con fecha real, siempre asignalo. El sistema muestra alertas de vencimiento.
+   Si el usuario mencionó "el miércoles", "esta semana", "el 30" → convertí a fecha ISO real.
+
+5. Para 'initial_items':
+   - Tiendita/bodega/construcción: productos/materiales reales con cantidad y costo
+   - General/delegacion: recursos del contexto (medicamentos, materiales, etc), costo Q0 si no aplica
 
 5. Para 'initial_items':
    - Tiendita/bodega/construcción: productos/materiales reales con cantidad y costo

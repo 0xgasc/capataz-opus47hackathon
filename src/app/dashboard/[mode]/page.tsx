@@ -157,7 +157,8 @@ async function loadDashboard(key: string) {
 
   const tasks = project.business_id
     ? await sql<TaskItem[]>`
-        select id, title, detail, cadence, category, status, evidence_required
+        select id, title, detail, cadence, category, status, evidence_required,
+               due_at::text, last_completed_at::text
         from tasks
         where business_id = ${project.business_id}
         order by
@@ -334,6 +335,8 @@ export default async function DashboardPage({
   const displayName = project.business_name ?? project.name;
   const pendingTasks = tasks.filter((t) => t.status === "pending" || t.status === "in_progress");
   const pendingCount = pendingTasks.length;
+  const overdueCount = pendingTasks.filter((t) => t.due_at && new Date(t.due_at) < new Date()).length;
+  const anomalyCount = messages.reduce((n, m) => n + m.anomalies.length, 0);
   const suggestions = buildSuggestions({
     vertical: mode,
     pendingTasks: pendingTasks.map((t) => ({ title: t.title })),
@@ -444,14 +447,22 @@ export default async function DashboardPage({
         {tasks.length > 0 && (
           <details className="border-b border-zinc-900" open={pendingCount > 0 && messages.length < 3}>
             <summary className="cursor-pointer px-4 sm:px-5 py-3 text-sm text-zinc-300 hover:text-zinc-100 flex items-center justify-between list-none">
-              <span className="flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-wider text-zinc-500">
-                  Protocolo
-                </span>
+              <span className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] uppercase tracking-wider text-zinc-500">Protocolo</span>
                 <span className="text-zinc-700">·</span>
-                <span>{pendingCount} pendientes</span>
+                <span className="text-sm">{pendingCount} pendientes</span>
+                {overdueCount > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-950/60 border border-rose-800/60 text-rose-400">
+                    {overdueCount} vencida{overdueCount > 1 ? "s" : ""}
+                  </span>
+                )}
+                {anomalyCount > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/60 text-amber-400">
+                    {anomalyCount} alerta{anomalyCount > 1 ? "s" : ""}
+                  </span>
+                )}
               </span>
-              <span className="text-zinc-600 text-xs">tocá ▾</span>
+              <span className="text-zinc-600 text-xs shrink-0">tocá ▾</span>
             </summary>
             <div className="px-3 sm:px-4 pb-4">
               {slug && <TaskList slug={slug} tasks={tasks} />}

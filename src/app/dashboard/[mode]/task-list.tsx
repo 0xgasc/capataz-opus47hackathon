@@ -42,6 +42,8 @@ export type TaskItem = {
   category: string | null;
   status: string;
   evidence_required: string | null;
+  due_at: string | null;
+  last_completed_at: string | null;
 };
 
 const CADENCE_LABEL: Record<string, string> = {
@@ -243,7 +245,11 @@ export function TaskList({ slug, tasks }: { slug: string; tasks: TaskItem[] }) {
         const isComment = openTaskId === t.id;
         const isEvidence = evidenceTaskId === t.id;
         return (
-          <div key={t.id} className="rounded-xl border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 transition-colors">
+          <div key={t.id} className={`rounded-xl border bg-zinc-900/40 hover:bg-zinc-900/70 transition-colors ${
+            t.status === "in_progress" ? "border-sky-800/60" :
+            t.due_at && new Date(t.due_at) < new Date() ? "border-rose-900/60" :
+            "border-zinc-800"
+          }`}>
             <div className="flex items-start gap-3 px-3 sm:px-4 py-3">
               <button
                 type="button"
@@ -258,6 +264,21 @@ export function TaskList({ slug, tasks }: { slug: string; tasks: TaskItem[] }) {
                   <p className="text-[12px] text-zinc-500 mt-0.5 leading-snug break-words">{t.detail}</p>
                 )}
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {t.status === "in_progress" && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-sky-950/60 border border-sky-800/60 text-sky-400">
+                      en progreso
+                    </span>
+                  )}
+                  {t.due_at && new Date(t.due_at) < new Date() && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-950/60 border border-rose-800/60 text-rose-400">
+                      vencida {new Date(t.due_at).toLocaleDateString("es-GT", { day: "numeric", month: "short" })}
+                    </span>
+                  )}
+                  {t.due_at && new Date(t.due_at) >= new Date() && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-zinc-700 text-zinc-500">
+                      vence {new Date(t.due_at).toLocaleDateString("es-GT", { day: "numeric", month: "short" })}
+                    </span>
+                  )}
                   <span className="text-[10px] uppercase tracking-wider text-zinc-500">
                     {CADENCE_LABEL[t.cadence] ?? t.cadence}
                   </span>
@@ -271,7 +292,7 @@ export function TaskList({ slug, tasks }: { slug: string; tasks: TaskItem[] }) {
                     <>
                       <span className="text-zinc-700 text-[10px]">·</span>
                       <span className="text-[10px] uppercase tracking-wider text-amber-500">
-                        {t.evidence_required === "photo" ? "📷 foto" : t.evidence_required === "note" ? "✍️ nota" : "📷 o nota"}
+                        {t.evidence_required === "photo" ? "📷 foto" : t.evidence_required === "note" ? "✍️ nota" : "📷/nota"}
                       </span>
                     </>
                   )}
