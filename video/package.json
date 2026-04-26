@@ -1,0 +1,23 @@
+{
+  "name": "capataz-video",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx remotion studio",
+    "render:intro": "npx remotion render Intro out/01-intro.mp4",
+    "render:meetcapataz": "npx remotion render MeetCapataz out/02-meet-capataz.mp4",
+    "render:costticker": "npx remotion render CostTicker out/03-cost-ticker.mp4",
+    "render:closing": "npx remotion render ClosingSlate out/04-closing.mp4",
+    "render:all": "npm run render:intro && npm run render:meetcapataz && npm run render:costticker && npm run render:closing"
+  },
+  "dependencies": {
+    "@remotion/media-utils": "^4.0.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.0.0"
+  }
+}
