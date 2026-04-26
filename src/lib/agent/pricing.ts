@@ -52,13 +52,39 @@ export function estimateCostUsd(
 ): number {
   if (!usage) return 0;
   const p = priceFor(model);
+  // Per Anthropic: input_tokens, cache_read_input_tokens, cache_creation_input_tokens
+  // are independent counters. Their sum is the total tokens billed for input.
+  const fresh = usage.input_tokens ?? 0;
   const cached = usage.cache_read_input_tokens ?? 0;
   const created = usage.cache_creation_input_tokens ?? 0;
-  const fresh = Math.max(0, (usage.input_tokens ?? 0) - cached - created);
   return (
     (fresh / 1_000_000) * p.input_per_million +
     (cached / 1_000_000) * (p.cache_read_per_million ?? p.input_per_million) +
     (created / 1_000_000) * (p.cache_write_per_million ?? p.input_per_million) +
+    ((usage.output_tokens ?? 0) / 1_000_000) * p.output_per_million
+  );
+}
+
+// Cost a request would have been WITHOUT any caching — useful for showing the
+// savings the demo achieved. (Cached + created tokens billed at the full input
+// rate as if they'd been processed fresh every time.)
+export function estimateUncachedCostUsd(
+  model: string | null | undefined,
+  usage: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  } | null,
+): number {
+  if (!usage) return 0;
+  const p = priceFor(model);
+  const totalInput =
+    (usage.input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0) +
+    (usage.cache_creation_input_tokens ?? 0);
+  return (
+    (totalInput / 1_000_000) * p.input_per_million +
     ((usage.output_tokens ?? 0) / 1_000_000) * p.output_per_million
   );
 }

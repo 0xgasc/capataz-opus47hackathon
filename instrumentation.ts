@@ -49,7 +49,15 @@ export async function register() {
   setTimeout(() => void fire(), 30_000);
   setInterval(() => void fire(), intervalMs);
 
+  // Lightweight keep-alive: hit the landing every minute so Railway doesn't
+  // cold-start mid-demo. Cheap (one Postgres query, no LLM call).
+  if (process.env.KEEPALIVE_DISABLED !== "true") {
+    setInterval(() => {
+      fetch(`${baseUrl}/`, { method: "HEAD" }).catch(() => {});
+    }, 60_000);
+  }
+
   console.log(
-    `[cron] scheduler started — every ${intervalMin}min against ${baseUrl}`,
+    `[cron] scheduler started — every ${intervalMin}min against ${baseUrl} · keepalive ${process.env.KEEPALIVE_DISABLED === "true" ? "off" : "on"}`,
   );
 }

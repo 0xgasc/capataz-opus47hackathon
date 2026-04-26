@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { asObject } from "@/lib/json";
-import { estimateCostUsd, formatUsd } from "@/lib/agent/pricing";
+import { estimateCostUsd, estimateUncachedCostUsd, formatUsd } from "@/lib/agent/pricing";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Capataz · agentes" };
@@ -86,7 +86,10 @@ async function loadAgents() {
     runs: number;
     input_tokens: number;
     output_tokens: number;
+    cache_read_tokens: number;
+    cache_create_tokens: number;
     cost_usd: number;
+    uncached_cost_usd: number;
   };
   const byModel24h = new Map<string, Bucket>();
   const byModel7d = new Map<string, Bucket>();
@@ -97,12 +100,23 @@ async function loadAgents() {
   const _24h = 24 * 3600 * 1000;
   const _7d = 7 * 24 * 3600 * 1000;
 
-  function bump(map: Map<string, Bucket>, key: string, usage: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | null, cost: number) {
-    const cur = map.get(key) ?? { runs: 0, input_tokens: 0, output_tokens: 0, cost_usd: 0 };
+  function bump(map: Map<string, Bucket>, key: string, usage: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | null, cost: number, uncachedCost: number) {
+    const cur = map.get(key) ?? {
+      runs: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+      cache_create_tokens: 0,
+      cost_usd: 0,
+      uncached_cost_usd: 0,
+    };
     cur.runs += 1;
     cur.input_tokens += usage?.input_tokens ?? 0;
     cur.output_tokens += usage?.output_tokens ?? 0;
+    cur.cache_read_tokens += usage?.cache_read_input_tokens ?? 0;
+    cur.cache_create_tokens += usage?.cache_creation_input_tokens ?? 0;
     cur.cost_usd += cost;
+    cur.uncached_cost_usd += uncachedCost;
     map.set(key, cur);
   }
 
@@ -113,12 +127,13 @@ async function loadAgents() {
     const intent = (inp.intent as string | undefined) ?? (out.intent as string | undefined) ?? "(unknown)";
     const usage = (out.usage as Bucket | null | undefined) ?? null;
     const cost = estimateCostUsd(model, usage as never);
+    const uncachedCost = estimateUncachedCostUsd(model, usage as never);
     const ts = new Date(r.started_at).getTime();
-    if (now - ts <= _24h) bump(byModel24h, model, usage as never, cost);
+    if (now - ts <= _24h) bump(byModel24h, model, usage as never, cost, uncachedCost);
     if (now - ts <= _7d) {
-      bump(byModel7d, model, usage as never, cost);
-      bump(byBusiness7d, r.business_slug, usage as never, cost);
-      bump(byIntent7d, intent, usage as never, cost);
+      bump(byModel7d, model, usage as never, cost, uncachedCost);
+      bump(byBusiness7d, r.business_slug, usage as never, cost, uncachedCost);
+      bump(byIntent7d, intent, usage as never, cost, uncachedCost);
     }
   }
 
@@ -347,9 +362,37 @@ export default async function AgentsPage() {
                 )}
               </div>
             </div>
+            {(() => {
+              const totalActual = byModel7d.reduce((acc, b) => acc + b.cost_usd, 0);
+              const totalUncached = byModel7d.reduce((acc, b) => acc + b.uncached_cost_usd, 0);
+              const savings = totalUncached - totalActual;
+              const savingsPct = totalUncached > 0 ? (savings / totalUncached) * 100 : 0;
+              const totalCacheRead = byModel7d.reduce((acc, b) => acc + b.cache_read_tokens, 0);
+              if (totalCacheRead === 0) return null;
+              return (
+                <div className="mt-4 pt-4 border-t border-zinc-800 flex items-baseline justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                      Ahorro por prompt caching (7d)
+                    </p>
+                    <p className="text-sm text-emerald-300 tabular-nums mt-0.5">
+                      {formatUsd(savings)} <span className="text-zinc-500">de</span>{" "}
+                      {formatUsd(totalUncached)}{" "}
+                      <span className="text-zinc-500">
+                        ({savingsPct.toFixed(0)}% menos · {totalCacheRead.toLocaleString()} tokens cacheados)
+                      </span>
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 max-w-xs text-right leading-snug">
+                    Anthropic cachea el system prompt + tool definitions; cada nueva
+                    corrida solo paga 10% del costo del input estable.
+                  </p>
+                </div>
+              );
+            })()}
             <p className="text-[10px] text-zinc-600 mt-3 leading-relaxed">
               Costos calculados con tarifas públicas estimadas: Opus 4.7 $15/$75, Sonnet 4.6 $3/$15,
-              Haiku 4.5 $1/$5 por millón de tokens (in/out). Tokens cacheados se descuentan al 10%.
+              Haiku 4.5 $1/$5 por millón de tokens (in/out). Tokens cacheados pagan 10%; creación de cache paga 1.25x.
             </p>
           </div>
         </section>
