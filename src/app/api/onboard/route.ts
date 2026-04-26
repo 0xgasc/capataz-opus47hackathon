@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
   message: z.string().min(0).max(2000),
-  image_url: z.string().url().optional(),
+  attachment_url: z.string().url().optional(),
+  attachment_type: z.enum(["image", "pdf", "document"]).optional(),
   history: z
     .array(
       z.object({
@@ -46,7 +47,8 @@ export async function POST(req: NextRequest) {
   try {
     const result = await runOnboardTurn({
       message: parsed.data.message,
-      imageUrl: parsed.data.image_url,
+      attachmentUrl: parsed.data.attachment_url,
+      attachmentType: parsed.data.attachment_type,
       history: parsed.data.history ?? [],
       sessionId,
     });

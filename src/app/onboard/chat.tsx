@@ -51,10 +51,25 @@ function getSpeechCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+type AttachmentType = "image" | "pdf" | "document";
+
+function detectType(file: File): AttachmentType {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type === "application/pdf" || file.name.endsWith(".pdf")) return "pdf";
+  return "document";
+}
+
+function fileIcon(type: AttachmentType) {
+  if (type === "image") return "📷";
+  if (type === "pdf") return "📄";
+  return "📎";
+}
+
 type Msg = {
   role: "user" | "assistant";
   content: string;
-  imageUrl?: string;
+  attachmentUrl?: string;
+  attachmentType?: AttachmentType;
   thinking?: string | null;
 };
 
@@ -98,7 +113,7 @@ export function OnboardChat() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [pendingImage, setPendingImage] = useState<{ file: File; url?: string; pct: number } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ file: File; type: AttachmentType; url?: string; pct: number } | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
 
@@ -140,29 +155,36 @@ export function OnboardChat() {
   }
 
   async function onFilePicked(file: File) {
-    if (!file.type.startsWith("image/")) { setError("solo imágenes por ahora"); return; }
     setError(null);
-    setPendingImage({ file, pct: 0 });
+    const type = detectType(file);
+    setPendingFile({ file, type, pct: 0 });
     try {
       const url = await uploadToStash(file, (pct) =>
-        setPendingImage((cur) => cur && cur.file === file ? { ...cur, pct } : cur)
+        setPendingFile((cur) => cur && cur.file === file ? { ...cur, pct } : cur)
       );
-      setPendingImage({ file, url, pct: 1 });
+      setPendingFile({ file, type, url, pct: 1 });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "error subiendo foto");
-      setPendingImage(null);
+      setError(err instanceof Error ? err.message : "error subiendo archivo");
+      setPendingFile(null);
     }
   }
 
   async function send() {
     const text = input.trim();
-    const imageUrl = pendingImage?.url;
-    if ((!text && !imageUrl) || pending) return;
+    const attachmentUrl = pendingFile?.url;
+    const attachmentType = pendingFile?.type;
+    if ((!text && !attachmentUrl) || pending) return;
     setInput("");
-    setPendingImage(null);
+    setPendingFile(null);
     setError(null);
 
-    const userMsg: Msg = { role: "user", content: text || "📷 foto adjunta", imageUrl };
+    const icon = attachmentType ? fileIcon(attachmentType) : "📎";
+    const userMsg: Msg = {
+      role: "user",
+      content: text || `${icon} archivo adjunto`,
+      attachmentUrl,
+      attachmentType,
+    };
     const next = [...messages, userMsg];
     setMessages(next);
     setPending(true);
@@ -171,8 +193,9 @@ export function OnboardChat() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          message: text || "Adjunté una imagen.",
-          image_url: imageUrl,
+          message: text || "Adjunté un archivo.",
+          attachment_url: attachmentUrl,
+          attachment_type: attachmentType,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
@@ -211,13 +234,23 @@ export function OnboardChat() {
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className="max-w-[88%]">
-                {m.imageUrl && (
+                {m.attachmentUrl && m.attachmentType === "image" && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={m.imageUrl}
+                    src={m.attachmentUrl}
                     alt="adjunto"
                     className="max-h-48 w-auto rounded-xl rounded-br-md mb-1.5 border border-emerald-800/60"
                   />
+                )}
+                {m.attachmentUrl && m.attachmentType !== "image" && (
+                  <a
+                    href={m.attachmentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 mb-1.5 underline underline-offset-2"
+                  >
+                    {fileIcon(m.attachmentType ?? "document")} {m.attachmentType === "pdf" ? "PDF adjunto" : "Documento adjunto"}
+                  </a>
                 )}
                 <div className={`text-sm rounded-2xl px-3.5 py-2.5 leading-relaxed whitespace-pre-wrap break-words ${
                   m.role === "user"
@@ -239,21 +272,18 @@ export function OnboardChat() {
           {error && <p className="text-xs text-rose-400 px-1">⚠ {error}</p>}
         </div>
 
-        {/* Pending image preview */}
-        {pendingImage && (
+        {/* Pending file preview */}
+        {pendingFile && (
           <div className="mx-3 mb-2 flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-xs">
+            <span className="shrink-0">{fileIcon(pendingFile.type)}</span>
             <span className="text-zinc-400 truncate flex-1">
-              📎 {pendingImage.file.name}{" "}
-              {pendingImage.url
+              {pendingFile.file.name}{" "}
+              {pendingFile.url
                 ? <span className="text-emerald-400">listo</span>
-                : <span className="text-amber-400">subiendo {Math.round(pendingImage.pct * 100)}%</span>
+                : <span className="text-amber-400">subiendo {Math.round(pendingFile.pct * 100)}%</span>
               }
             </span>
-            <button
-              type="button"
-              onClick={() => setPendingImage(null)}
-              className="text-zinc-500 hover:text-rose-400"
-            >
+            <button type="button" onClick={() => setPendingFile(null)} className="text-zinc-500 hover:text-rose-400">
               quitar
             </button>
           </div>
@@ -267,7 +297,7 @@ export function OnboardChat() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf,.pdf,.docx,.doc,.xlsx,.xls,.csv,.txt"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -279,8 +309,8 @@ export function OnboardChat() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={pending || !!pendingImage}
-            title="adjuntar foto"
+            disabled={pending || !!pendingFile}
+            title="adjuntar archivo"
             className="shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-40 transition-colors text-base"
           >
             📎
@@ -316,7 +346,7 @@ export function OnboardChat() {
 
           <button
             type="submit"
-            disabled={pending || (!input.trim() && !pendingImage?.url)}
+            disabled={pending || (!input.trim() && !pendingFile?.url)}
             className="shrink-0 rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-500 text-white text-sm font-medium px-4 py-2 transition-colors"
           >
             {pending ? "…" : "enviar"}

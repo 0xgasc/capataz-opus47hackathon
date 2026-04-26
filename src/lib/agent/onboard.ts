@@ -155,7 +155,8 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
 export type OnboardTurnInput = {
   history: Array<{ role: "user" | "assistant"; content: string }>;
   message: string;
-  imageUrl?: string;
+  attachmentUrl?: string;
+  attachmentType?: "image" | "pdf" | "document";
   sessionId?: string;
 };
 
@@ -299,12 +300,20 @@ export async function runOnboardTurn(input: OnboardTurnInput): Promise<OnboardTu
     ...input.history.map((m) => ({ role: m.role, content: m.content }) as Anthropic.MessageParam),
     {
       role: "user",
-      content: input.imageUrl
-        ? [
-            { type: "image" as const, source: { type: "url" as const, url: input.imageUrl } },
-            { type: "text" as const, text: input.message || "Adjunté una imagen." },
-          ]
-        : input.message,
+      content: (() => {
+        const { attachmentUrl: url, attachmentType: type, message } = input;
+        if (!url) return message;
+        if (type === "image") return [
+          { type: "image" as const, source: { type: "url" as const, url } },
+          { type: "text" as const, text: message || "Adjunté una imagen." },
+        ];
+        if (type === "pdf") return [
+          { type: "document" as const, source: { type: "url" as const, url } },
+          { type: "text" as const, text: message || "Adjunté un PDF." },
+        ];
+        // docx/xlsx/csv/txt — pass url as text context, Opus can acknowledge it
+        return `${message || "Adjunté un documento."}\n\n[Documento adjunto: ${url}]`;
+      })(),
     },
   ];
 
