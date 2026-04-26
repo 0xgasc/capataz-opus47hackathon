@@ -249,9 +249,13 @@ export function TaskLogger({ tasks: initial, token }: { tasks: Task[]; token: st
         <TaskCard key={t.id} task={t} token={token} onLogged={onLogged} />
       ))}
       {tasks.length === 0 && (
-        <p className="text-sm text-zinc-500 text-center py-8">
-          Este encargo no tiene tareas todavía.
-        </p>
+        <div className="text-center py-8">
+          <p className="text-2xl mb-2">✅</p>
+          <p className="text-sm font-medium text-zinc-300">Todo listo por ahora.</p>
+          <p className="text-xs text-zinc-500 mt-1">
+            Las tareas recurrentes van a volver a aparecer según su cadencia.
+          </p>
+        </div>
       )}
     </div>
   );

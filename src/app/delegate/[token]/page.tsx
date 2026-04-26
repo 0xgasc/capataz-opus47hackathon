@@ -11,7 +11,24 @@ type TaskRow = {
   category: string | null;
   status: string;
   evidence_required: string | null;
+  cadence: string | null;
+  due_at: string | null;
+  last_completed_at: string | null;
 };
+
+function nextOccurrenceLabel(t: TaskRow): string | null {
+  if (!t.cadence || t.cadence === "one_off") {
+    if (t.due_at) {
+      const d = new Date(t.due_at);
+      return `vence ${d.toLocaleDateString("es-GT", { day: "numeric", month: "short" })}`;
+    }
+    return null;
+  }
+  if (t.cadence === "daily") return "se repite mañana";
+  if (t.cadence === "weekly") return "se repite la próxima semana";
+  if (t.cadence === "monthly") return "se repite el próximo mes";
+  return null;
+}
 
 async function loadEncargo(token: string) {
   const rows = await sql<Array<{
@@ -29,7 +46,8 @@ async function loadEncargo(token: string) {
   const { business_id, business_name, owner_name, description } = rows[0];
 
   const tasks = await sql<TaskRow[]>`
-    select id, title, detail, category, status, evidence_required
+    select id, title, detail, category, status, evidence_required,
+           cadence, due_at::text, last_completed_at::text
     from tasks
     where business_id = ${business_id}
     order by
@@ -51,9 +69,13 @@ export default async function DelegatePage({
   if (!data) notFound();
 
   const { business_name, owner_name, description, tasks } = data;
-  const done = tasks.filter((t) => t.status === "done").length;
-  const total = tasks.length;
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  const activeTasks = tasks.filter((t) => t.status !== "done");
+  const doneTasks   = tasks.filter((t) => t.status === "done");
+  const recurring   = doneTasks.filter((t) => t.cadence && t.cadence !== "one_off");
+  const done        = doneTasks.length;
+  const total       = tasks.length;
+  const pct         = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
@@ -87,8 +109,48 @@ export default async function DelegatePage({
           </div>
         </div>
 
-        {/* Task list */}
-        <TaskLogger tasks={tasks} token={token} />
+        {/* Active tasks */}
+        <TaskLogger tasks={activeTasks} token={token} />
+
+        {/* Pipeline — recurring tasks that will come back */}
+        {recurring.length > 0 && (
+          <section className="mt-8">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 bg-zinc-800" />
+              <p className="text-[10px] uppercase tracking-widest text-zinc-500 shrink-0">
+                En el pipeline
+              </p>
+              <div className="h-px flex-1 bg-zinc-800" />
+            </div>
+            <p className="text-xs text-zinc-600 mb-3 text-center">
+              Tareas recurrentes — CAPA las va a reponer automáticamente.
+            </p>
+            <ul className="space-y-2">
+              {recurring.map((t) => {
+                const next = nextOccurrenceLabel(t);
+                return (
+                  <li key={t.id} className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 px-4 py-3 flex items-start gap-3">
+                    {/* Cadence icon */}
+                    <div className="mt-0.5 shrink-0 text-base">
+                      {t.cadence === "daily" ? "🔄" : t.cadence === "weekly" ? "📅" : "🗓️"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-zinc-400 leading-snug">{t.title}</p>
+                      {t.detail && (
+                        <p className="text-xs text-zinc-600 mt-0.5 leading-relaxed">{t.detail}</p>
+                      )}
+                    </div>
+                    {next && (
+                      <span className="shrink-0 text-[10px] uppercase tracking-wider text-zinc-600 border border-zinc-800 rounded px-1.5 py-0.5 mt-0.5">
+                        {next}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <footer className="mt-8 text-center text-[11px] text-zinc-600">
           Powered by CAPA · Claude Opus 4.7
