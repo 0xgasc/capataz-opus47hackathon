@@ -11,6 +11,7 @@ import { DailySnapshot } from "./daily-snapshot";
 import { HitlCard, type HitlOpen } from "./hitl-card";
 import { formatGTQ } from "@/lib/format";
 import { ModeSwitcher } from "./switcher";
+import { ShareButton } from "./share-button";
 import { ChatInput } from "./chat-input";
 import { ChatThread, type ChatMessage } from "./chat-thread";
 import { TaskList, type TaskItem } from "./task-list";
@@ -64,10 +65,12 @@ async function loadDashboard(key: string) {
       business_slug: string | null;
       business_name: string | null;
       owner_name: string | null;
+      magic_token: string | null;
     }>
   >`
     select p.id, p.name, p.mode,
-           p.business_id, b.slug as business_slug, b.name as business_name, b.owner_name
+           p.business_id, b.slug as business_slug, b.name as business_name, b.owner_name,
+           b.magic_token::text as magic_token
     from projects p
     join businesses b on b.id = p.business_id
     where b.slug = ${key}
@@ -84,10 +87,12 @@ async function loadDashboard(key: string) {
         business_slug: string | null;
         business_name: string | null;
         owner_name: string | null;
+        magic_token: string | null;
       }>
     >`
       select p.id, p.name, p.mode,
-             p.business_id, b.slug as business_slug, b.name as business_name, b.owner_name
+             p.business_id, b.slug as business_slug, b.name as business_name, b.owner_name,
+             b.magic_token::text as magic_token
       from projects p
       left join businesses b on b.id = p.business_id
       where p.mode = ${key}
@@ -287,6 +292,7 @@ async function loadDashboard(key: string) {
       : null,
     moduleRequests,
     openHitl,
+    magicToken: project.magic_token ?? null,
   };
 }
 
@@ -316,7 +322,7 @@ export default async function DashboardPage({
     );
   }
 
-  const { project, messages, tasks, recentItems, lastCheckIn, valuation, cobrosEnabled, lenderViewEnabled, suggestion, moduleRequests, openHitl } = data;
+  const { project, messages, tasks, recentItems, lastCheckIn, valuation, cobrosEnabled, lenderViewEnabled, suggestion, moduleRequests, openHitl, magicToken } = data;
   const mode = (project.mode as Mode) ?? "construction";
   const copy = MODE_COPY[mode] ?? MODE_COPY.construction;
   const slug = project.business_slug;
@@ -374,6 +380,7 @@ export default async function DashboardPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {magicToken && <ShareButton token={magicToken} />}
             <ThemeToggle />
             <ModeSwitcher current={mode} />
           </div>

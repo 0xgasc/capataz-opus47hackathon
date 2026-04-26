@@ -17,7 +17,9 @@
     "demo:reset": "tsx scripts/demo/06-reset.ts",
     "e2e": "tsx scripts/e2e/run-all.ts",
     "demo:7": "tsx scripts/demo/07-tiendita.ts",
-    "demo:8": "tsx scripts/demo/08-memory.ts"
+    "demo:8": "tsx scripts/demo/08-memory.ts",
+    "demo:9": "tsx scripts/demo/09-dona-rosa-morning.ts",
+    "demo:10": "tsx scripts/demo/10-cross-vertical-flip.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
