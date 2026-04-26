@@ -5,7 +5,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 export const dynamic = "force-dynamic";
 
-type Vertical = "construction" | "inventory" | "tiendita" | "general";
+type Vertical = "construction" | "inventory" | "tiendita" | "general" | "delegacion";
 
 type BusinessRow = {
   id: string;
@@ -51,6 +51,8 @@ function verticalBadge(v: string): string {
     ? "bg-sky-950/30 text-sky-300 border-sky-900/50"
     : v === "general"
     ? "bg-violet-950/30 text-violet-300 border-violet-900/50"
+    : v === "delegacion"
+    ? "bg-rose-950/30 text-rose-300 border-rose-900/50"
     : "bg-emerald-950/30 text-emerald-300 border-emerald-900/50";
 }
 

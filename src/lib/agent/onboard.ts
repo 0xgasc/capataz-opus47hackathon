@@ -19,18 +19,21 @@ Verticales disponibles HOY (no inventés otras):
 - construction: obras y proyectos de construcción, capataces, contratistas.
 - inventory: bodegas mayoristas / distribuidoras B2B donde el inventario es colateral de un préstamo.
 - tiendita: cualquier negocio que vende al menudeo a clientes finales — tiendas, panaderías, pizzerías, restaurantes, salones, ferreterías, farmacias.
-- general: TODO LO DEMÁS — hogares (cuidado de adultos mayores, niños, mascotas), iglesias, comunidades, clubs, voluntariados, familias, rutinas personales. Si la persona NO está hablando de algo que se vende o se construye, usá 'general'.
+- general: hogares (cuidado de adultos mayores, niños, mascotas), iglesias, comunidades, clubs, voluntariados, familias, rutinas personales.
+- delegacion: PARA ENCARGOS — cuando alguien necesita delegar una lista de tareas a otra persona. El dueño describe QUÉ hay que hacer, Capataz crea el checklist, y genera un link que el delegado abre en su celular para ir marcando y documentando cada paso con fotos y notas. Usá 'delegacion' cuando: "necesito que alguien haga X", "voy a mandar a un empleado a", "quiero que mi cuñado se encargue de", "necesito un checklist para", "quiero delegar".
 
 Tu proceso:
 1. Si la persona es vaga o falta info clave (vertical aproximado, nombre, quién está a cargo, 4-6 cosas iniciales relevantes), llamá 'ask_clarification' con UNA pregunta corta. Adaptá el lenguaje:
    - Negocio: pregunta por productos, costos, proveedores.
    - Hogar / comunidad / personal: pregunta por las personas involucradas, las cosas a llevar (medicamentos, citas, actividades), la cadencia.
+   - Delegación: si la persona quiere delegar, preguntá qué hay que hacer, quién lo hará, y si hay foto/documentación que acompañe cada paso.
 2. Una vez tengas suficiente, llamá 'provision_business' con TODO incluyendo un protocolo bespoke (initial_tasks).
 3. Para 'initial_items', adaptá el concepto al contexto:
    - Tiendita / bodega: productos en stock con cantidad y costo.
    - Construcción: materiales del presupuesto.
    - General (hogar/iglesia/etc): cosas a llevar — pueden ser medicamentos con stock, gastos recurrentes, eventos confirmados, personas a cargo. Costo Q 0 está bien si no aplica.
-4. El protocolo (initial_tasks) DEBE ser específico al contexto. Ejemplos:
+   - Delegación: poné los materiales o recursos que necesita el delegado. Si no hay nada, poné un item simbólico con qty 1, costo Q 0.
+4. El protocolo (initial_tasks) DEBE ser específico al contexto. Para 'delegacion', los initial_tasks SON las tareas del encargo — pasos concretos que el delegado ejecutará en orden. Cada tarea debe ser accionable ("Fotografiar la fachada", "Limpiar el área 3", "Revisar medidor de agua y anotar lectura"). Usá cadence 'one_off' para tareas del encargo.
    - Pizzería: "Preparar masa antes de 9am", "Limpieza profunda del horno los domingos".
    - Panadería: "Encender horno a las 4am", "Cuadrar caja primera tanda".
    - Salón: "Confirmar citas por WhatsApp", "Inventario de tintes".
@@ -66,7 +69,7 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
       type: "object",
       required: ["vertical", "name", "owner_name", "initial_items", "initial_tasks"],
       properties: {
-        vertical: { type: "string", enum: ["construction", "inventory", "tiendita", "general"] },
+        vertical: { type: "string", enum: ["construction", "inventory", "tiendita", "general", "delegacion"] },
         name: {
           type: "string",
           description:
@@ -152,7 +155,7 @@ async function uniqueSlug(base: string): Promise<string> {
 }
 
 async function provisionBusiness(input: Record<string, unknown>): Promise<OnboardTurnOutput["business"]> {
-  const vertical = String(input.vertical ?? "general") as "construction" | "inventory" | "tiendita" | "general";
+  const vertical = String(input.vertical ?? "general") as "construction" | "inventory" | "tiendita" | "general" | "delegacion";
   const name = String(input.name ?? "Negocio sin nombre");
   const ownerName = input.owner_name ? String(input.owner_name) : null;
   const ownerEmail = input.owner_email ? String(input.owner_email) : null;

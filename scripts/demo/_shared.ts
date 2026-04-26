@@ -4,7 +4,7 @@
 
 import postgres from "postgres";
 
-export type Mode = "construction" | "inventory" | "tiendita";
+export type Mode = "construction" | "inventory" | "tiendita" | "general" | "delegacion";
 
 export function parseArgs() {
   const args = process.argv.slice(2);

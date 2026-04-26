@@ -10,11 +10,18 @@ export default async function JoinPage({
 }) {
   const { token } = await params;
 
-  const rows = await sql<Array<{ slug: string }>>`
-    select slug from businesses where magic_token = ${token}::uuid
+  const rows = await sql<Array<{ slug: string; vertical: string }>>`
+    select slug, vertical from businesses where magic_token = ${token}::uuid
   `;
 
   if (!rows[0]) notFound();
 
-  redirect(`/dashboard/${rows[0].slug}`);
+  const { slug, vertical } = rows[0];
+
+  // Delegation spaces → worker view; everything else → owner dashboard
+  if (vertical === "delegacion") {
+    redirect(`/delegate/${token}`);
+  }
+
+  redirect(`/dashboard/${slug}`);
 }

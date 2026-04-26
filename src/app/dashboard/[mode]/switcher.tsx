@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type Mode = "construction" | "inventory" | "tiendita" | "general";
+type Mode = "construction" | "inventory" | "tiendita" | "general" | "delegacion";
 
 const ITEMS: Array<{ mode: Mode; label: string; sub: string }> = [
   { mode: "construction", label: "Construcción", sub: "Ops" },
