@@ -33,7 +33,7 @@ export async function CobrosWidget({ businessId }: { businessId: string }) {
           <p className="text-sm text-zinc-500 leading-relaxed">
             Nadie te debe nada todavía. Cuando alguien se lleve algo a crédito,
             decílo en el chat ("vendí 2 cervezas a Don Chepe que paga viernes")
-            y Capataz lo anota acá.
+            y CAPA lo anota acá.
           </p>
         ) : (
           <ul className="divide-y divide-zinc-800/60">
@@ -58,7 +58,7 @@ export async function CobrosWidget({ businessId }: { businessId: string }) {
           </ul>
         )}
         <p className="text-[11px] text-zinc-600 mt-3 leading-snug">
-          Para registrar un pago, decíselo a Capataz: "Don Chepe me pagó Q24" → se descuenta del saldo.
+          Para registrar un pago, decíselo a CAPA: "Don Chepe me pagó Q24" → se descuenta del saldo.
         </p>
       </div>
     </section>

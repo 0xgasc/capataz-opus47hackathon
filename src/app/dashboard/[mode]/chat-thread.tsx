@@ -37,7 +37,7 @@ function channelLabel(type: string): string | null {
       voice_note: "nota de voz",
       photo: "foto",
       task_completed: "tarea hecha",
-      scheduled_checkin: "recordatorio de Capataz",
+      scheduled_checkin: "recordatorio de CAPA",
       text_message: "Telegram",
     } as Record<string, string>
   )[type] ?? null;
@@ -56,7 +56,7 @@ export function ChatThread({ messages }: { messages: ChatMessage[] }) {
         <div className="max-w-sm">
           <p className="text-zinc-300 text-base">Aún no hay conversación.</p>
           <p className="text-sm text-zinc-500 mt-2 leading-relaxed">
-            Escribíle abajo a Capataz: contale lo que pasó, o tocá una tarea pendiente
+            Escribíle abajo a CAPA: contale lo que pasó, o tocá una tarea pendiente
             para marcarla hecha o pedirle ayuda con ella.
           </p>
         </div>
@@ -145,7 +145,7 @@ function AgentBubble({
           <span className="inline-block h-5 w-5 rounded-full bg-emerald-700 text-white text-[10px] flex items-center justify-center font-semibold">
             C
           </span>
-          <span>Capataz</span>
+          <span>CAPA</span>
           {thinking && (
             <span
               className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-violet-800/60 bg-violet-950/40 text-violet-300"

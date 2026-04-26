@@ -63,7 +63,7 @@ export function RequestModule({
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex-1 min-w-0">
             <p className="text-[12px] text-zinc-300 font-medium">
-              ¿Te falta algo? Pediles a Capataz que arme un módulo nuevo.
+              ¿Te falta algo? Pediles a CAPA que arme un módulo nuevo.
             </p>
             <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
               Ej: "control de fiados de mis clientes", "mapa de rutas de entrega",
@@ -106,7 +106,7 @@ export function RequestModule({
                 disabled={pending || !text.trim()}
                 className="text-[12px] bg-emerald-700 hover:bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-lg px-3 py-1.5 transition-colors"
               >
-                {pending ? "Capataz pensando…" : "enviar"}
+                {pending ? "CAPA pensando…" : "enviar"}
               </button>
             </div>
             {error && <p className="text-[11px] text-rose-400 mt-2">⚠ {error}</p>}
@@ -132,7 +132,7 @@ export function RequestModule({
                   <p className="text-[12px] text-zinc-200 break-words">"{r.user_message}"</p>
                   {r.agent_reply && (
                     <p className="text-[12px] text-zinc-400 mt-1 italic break-words">
-                      Capataz: {r.agent_reply}
+                      CAPA: {r.agent_reply}
                     </p>
                   )}
                   <span

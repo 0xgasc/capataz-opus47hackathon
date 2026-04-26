@@ -75,7 +75,7 @@ export function TaskList({ slug, tasks }: { slug: string; tasks: TaskItem[] }) {
   if (tasks.length === 0) {
     return (
       <p className="text-sm text-zinc-500 px-1 py-2">
-        Aún no hay protocolo. Pedíle a Capataz que te agregue tareas.
+        Aún no hay protocolo. Pedíle a CAPA que te agregue tareas.
       </p>
     );
   }
@@ -119,7 +119,7 @@ export function TaskList({ slug, tasks }: { slug: string; tasks: TaskItem[] }) {
                 type="button"
                 onClick={() => setOpenTaskId(isOpen ? null : t.id)}
                 className="shrink-0 text-zinc-500 hover:text-zinc-200 text-xs px-2 py-1 rounded hover:bg-zinc-800/80 transition-colors"
-                title="comentarle a Capataz sobre esta tarea"
+                title="comentarle a CAPA sobre esta tarea"
               >
                 💬
               </button>
@@ -129,7 +129,7 @@ export function TaskList({ slug, tasks }: { slug: string; tasks: TaskItem[] }) {
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder="contale a Capataz qué pasó con esta tarea…"
+                  placeholder="contale a CAPA qué pasó con esta tarea…"
                   rows={2}
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-700"
                 />

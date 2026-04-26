@@ -51,7 +51,7 @@ export function HitlCard({ slug, request }: { slug: string; request: HitlOpen })
       <div className={`rounded-xl border p-4 ${tone}`}>
         <div className="flex items-start gap-3">
           <span className="mt-0.5 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border border-violet-800/60 bg-violet-950/40 text-violet-200 shrink-0">
-            🤔 Capataz necesita guía
+            🤔 CAPA necesita guía
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-[15px] text-zinc-100 leading-relaxed break-words">
@@ -67,7 +67,7 @@ export function HitlCard({ slug, request }: { slug: string; request: HitlOpen })
         <textarea
           value={response}
           onChange={(e) => setResponse(e.target.value)}
-          placeholder="contale a Capataz, la próxima vez ya sabe…"
+          placeholder="contale a CAPA, la próxima vez ya sabe…"
           rows={2}
           disabled={pending}
           className="w-full mt-3 bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-700"

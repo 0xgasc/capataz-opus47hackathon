@@ -11,6 +11,7 @@
     "render:all": "npm run render:intro && npm run render:meetcapataz && npm run render:costticker && npm run render:closing"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.451",
     "@remotion/media-utils": "^4.0.0",
     "remotion": "^4.0.0"
   },
