@@ -157,7 +157,7 @@ async function loadDashboard(key: string) {
 
   const tasks = project.business_id
     ? await sql<TaskItem[]>`
-        select id, title, detail, cadence, category, status
+        select id, title, detail, cadence, category, status, evidence_required
         from tasks
         where business_id = ${project.business_id}
         order by

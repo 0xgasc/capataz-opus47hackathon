@@ -19,6 +19,8 @@ const BodySchema = z.discriminatedUnion("action", [
     action: z.literal("complete"),
     slug: z.string().min(1).max(80),
     task_id: z.string().min(1).max(80),
+    note: z.string().max(1000).optional(),
+    media_url: z.string().url().optional(),
   }),
   z.object({
     action: z.literal("comment"),
@@ -59,8 +61,8 @@ export async function POST(req: NextRequest) {
   const ctx = projects[0];
   const author = ctx.owner_name?.trim() || "tú";
 
-  const tasks = await sql<Array<{ id: string; title: string; status: string }>>`
-    select id, title, status from tasks
+  const tasks = await sql<Array<{ id: string; title: string; status: string; evidence_required: string | null }>>`
+    select id, title, status, evidence_required from tasks
     where id = ${data.task_id} and business_id = ${ctx.business_id}
   `;
   if (!tasks[0]) {
@@ -69,22 +71,27 @@ export async function POST(req: NextRequest) {
   const task = tasks[0];
 
   if (data.action === "complete") {
+    const note = "note" in data ? data.note : undefined;
+    const mediaUrl = "media_url" in data ? data.media_url : undefined;
+
     await sql`
       update tasks
       set status = 'done', last_completed_at = now(), updated_at = now()
       where id = ${task.id}
     `;
-    // Log a tiny event so the conversation reflects it.
     await sql`
-      insert into events (project_id, type, payload, created_by)
+      insert into events (project_id, type, payload, media_url, created_by)
       values (
         ${ctx.project_id},
         'task_completed',
         ${JSON.stringify({
           task_id: task.id,
           task_title: task.title,
+          note: note ?? null,
+          media_url: mediaUrl ?? null,
           source: "dashboard_click",
         })}::jsonb,
+        ${mediaUrl ?? null},
         ${author}
       )
     `;
