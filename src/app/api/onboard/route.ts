@@ -6,7 +6,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
-  message: z.string().min(1).max(2000),
+  message: z.string().min(0).max(2000),
+  image_url: z.string().url().optional(),
   history: z
     .array(
       z.object({
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
   try {
     const result = await runOnboardTurn({
       message: parsed.data.message,
+      imageUrl: parsed.data.image_url,
       history: parsed.data.history ?? [],
       sessionId,
     });
