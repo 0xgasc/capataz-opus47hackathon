@@ -62,7 +62,7 @@ export default async function DelegatePage({
         {/* Header */}
         <header className="mb-6">
           <p className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">
-            Capataz · Encargo
+            CAPA · Encargo
           </p>
           <h1 className="text-xl font-semibold leading-snug">{business_name}</h1>
           {owner_name && (
@@ -91,7 +91,7 @@ export default async function DelegatePage({
         <TaskLogger tasks={tasks} token={token} />
 
         <footer className="mt-8 text-center text-[11px] text-zinc-600">
-          Powered by Capataz · Claude Opus 4.7
+          Powered by CAPA · Claude Opus 4.7
         </footer>
       </div>
     </main>

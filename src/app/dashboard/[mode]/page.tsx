@@ -26,22 +26,22 @@ const MODE_COPY: Record<Mode, { label: string; greeting: string; emptyEvents: st
   construction: {
     label: "Construcción",
     greeting: "Tu obra, en chat",
-    emptyEvents: "Mandale a Capataz lo que está pasando en la obra para arrancar.",
+    emptyEvents: "Mandale a CAPA lo que está pasando en la obra para arrancar.",
   },
   inventory: {
     label: "Bodega",
     greeting: "Tu bodega, en chat",
-    emptyEvents: "Contale a Capataz qué entró o salió hoy.",
+    emptyEvents: "Contale a CAPA qué entró o salió hoy.",
   },
   tiendita: {
     label: "Tiendita",
     greeting: "Tu tiendita, en chat",
-    emptyEvents: "Mandale un mensaje a Capataz para empezar el día.",
+    emptyEvents: "Mandale un mensaje a CAPA para empezar el día.",
   },
   general: {
     label: "Rutina",
     greeting: "Tu día a día, en chat",
-    emptyEvents: "Contale a Capataz qué pasó hoy. Lo que sea — Capataz lo organiza.",
+    emptyEvents: "Contale a CAPA qué pasó hoy. Lo que sea — CAPA lo organiza.",
   },
   delegacion: {
     label: "Encargo",
@@ -351,7 +351,7 @@ export default async function DashboardPage({
               href="/"
               className="text-[11px] uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
             >
-              ← Capataz
+              ← CAPA
             </Link>
             <p className="text-base sm:text-lg font-semibold leading-tight truncate mt-0.5">
               {displayName}
@@ -366,7 +366,7 @@ export default async function DashboardPage({
                     className="text-zinc-500 hover:text-emerald-300"
                     title={`último check-in del cron: ${new Date(lastCheckIn.created_at).toLocaleString("es-GT")}`}
                   >
-                    Capataz revisó {timeAgoShort(lastCheckIn.created_at)}
+                    CAPA revisó {timeAgoShort(lastCheckIn.created_at)}
                   </Link>
                 </>
               )}

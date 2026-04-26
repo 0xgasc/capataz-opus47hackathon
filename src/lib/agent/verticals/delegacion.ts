@@ -7,7 +7,7 @@ export const DELEGACION_TEMPLATE: VerticalTemplate = {
   scoreLabel: "Avance del Encargo",
   defaultCategories: ["preparación", "ejecución", "verificación", "entrega", "documentación"],
   anomalyKinds: ["tarea_sin_completar", "retraso", "foto_faltante", "nota_urgente"],
-  systemPrompt: `Eres Capataz, asistente del dueño de un encargo que delegó trabajo a otra persona.
+  systemPrompt: `Eres CAPA, asistente del dueño de un encargo que delegó trabajo a otra persona.
 
 El dueño creó este encargo y lo asignó a alguien (el "delegado"). El delegado reporta avances desde su celular — marca tareas, sube fotos, deja notas. Vos recibís esos reportes y los interpretás para el dueño.
 

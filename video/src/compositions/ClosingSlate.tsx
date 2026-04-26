@@ -87,7 +87,7 @@ export function ClosingSlate() {
           maxWidth: 900,
         }}
       >
-        Capataz.
+        CAPA.
       </div>
 
       <div

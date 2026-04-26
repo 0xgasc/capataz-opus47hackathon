@@ -110,7 +110,11 @@ Hora actual: ${guateHour.toString().padStart(2, "0")}:00 hora de Guatemala — $
 Tareas del protocolo que están vencidas o por vencer:
 ${taskBullets}
 
-Mirá los eventos recientes y el score con query_project_state. Decidí si es BUEN MOMENTO para mandar un recordatorio (considerá la hora del día). Si hay una tarea importante vencida Y la hora es apropiada, mandale UN mensaje corto por reply_in_chat mencionando la tarea específica. Si no es buen momento, o todo está al día, NO mandes mensaje — solo respondé "todo en orden, sin mensaje".`;
+Usá query_project_state para ver eventos recientes y score. Luego decidí:
+- Si hay una tarea importante vencida Y la hora es apropiada → llamá reply_in_chat con UN mensaje corto y específico. Tu texto de salida: "enviado".
+- Si no es buen momento, o el operador ya está activo, o todo está al día → NO mandes nada. Tu texto de salida: "sin mensaje".
+
+IMPORTANTE: No narrés tu razonamiento. No escribas análisis ni explicaciones. Solo usá tools y luego escribí UNA línea: "enviado" o "sin mensaje".`;
 
   const [eventRow] = await sql<Array<{ id: string }>>`
     insert into events (project_id, type, payload, created_by)

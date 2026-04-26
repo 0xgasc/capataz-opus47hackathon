@@ -70,21 +70,19 @@ export default async function Landing() {
         <header className="mb-8 sm:mb-10">
           <div className="flex items-start justify-between gap-3 mb-3">
             <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-400">
-              Capataz · Claude Opus 4.7
+              CAPA · Claude Opus 4.7
             </p>
             <ThemeToggle />
           </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold leading-tight tracking-tight">
-            Un agente que vive donde ya conversás — Telegram, WhatsApp, mensajes de voz —
-            convierte notas de voz, fotos y mensajes en estado real, y aprende qué importa
-            sin pedirte que aprendas un programa.
+            El sistema de acciones correctivas y preventivas
+            que vive en tu celular.
           </h1>
           <p className="text-zinc-400 mt-4 text-sm sm:text-base leading-relaxed max-w-2xl">
-            Hecho para la gente que lleva operaciones desde el celular —
-            negocios chicos, hogares con personas a cargo, comunidades, voluntariados,
-            obras, bodegas, cualquier rutina importante. Cada situación tiene su propio
-            agente con memoria, su protocolo bespoke, su panel. Construido en Guatemala,
-            funciona en cualquier idioma que Opus entienda.
+            CAPA convierte notas de voz, fotos y mensajes en estado real —
+            sin que aprendas un programa. Cada situación tiene su propio agente con memoria,
+            su protocolo a medida, su panel auditable. Para cualquier operación que importe:
+            hogares, obras, tienditas, encargos, rutinas de campo.
           </p>
         </header>
 
@@ -198,7 +196,7 @@ export default async function Landing() {
 
         <footer className="mt-auto text-[11px] text-zinc-600 border-t border-zinc-900 pt-5 flex items-center justify-between flex-wrap gap-2">
           <span>
-            Hecho en Guatemala · funciona en cualquier idioma · MIT open source ·{" "}
+            CAPA · Corrective &amp; Preventive Actions · MIT open source ·{" "}
             <Link href="/agents" className="text-zinc-500 hover:text-emerald-300 underline">
               estado de los agentes
             </Link>

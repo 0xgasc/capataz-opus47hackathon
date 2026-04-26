@@ -256,7 +256,7 @@ export function ChatInput({
               void send();
             }
           }}
-          placeholder={listening ? "escuchando…" : "hablale a Capataz…"}
+          placeholder={listening ? "escuchando…" : "hablale a CAPA…"}
           rows={1}
           disabled={pending}
           className="flex-1 resize-none bg-zinc-900/80 border border-zinc-800 rounded-2xl px-4 py-3 text-[15px] text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-700 focus:border-emerald-700 max-h-32"
@@ -272,7 +272,7 @@ export function ChatInput({
       {pending && (
         <p className="text-[11px] text-amber-300 mt-2 text-center flex items-center justify-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-          Capataz está pensando…
+          CAPA está pensando…
         </p>
       )}
       {error && (

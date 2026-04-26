@@ -8,7 +8,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    const stored = localStorage.getItem("capataz-theme") as Theme | null;
+    const stored = localStorage.getItem("capa-theme") as Theme | null;
     const initial: Theme = stored ?? "light";
     document.documentElement.setAttribute("data-theme", initial);
     setTheme(initial);
@@ -17,7 +17,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   function toggle() {
     const next: Theme = theme === "light" ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("capataz-theme", next);
+    localStorage.setItem("capa-theme", next);
     setTheme(next);
   }
 

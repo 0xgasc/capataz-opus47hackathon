@@ -649,12 +649,23 @@ async function listCredits(input: Record<string, unknown>, ctx: ToolContext) {
 }
 
 async function replyInChat(input: Record<string, unknown>, ctx: ToolContext) {
-  if (ctx.chatId == null) return { sent: false, reason: "no chat_id in context" };
+  let chatId = ctx.chatId;
+
+  // If not in event payload, fall back to the business's stored telegram_chat_id.
+  if (chatId == null && ctx.businessId) {
+    const rows = await sql<Array<{ telegram_chat_id: string | null }>>`
+      select telegram_chat_id from businesses where id = ${ctx.businessId} limit 1
+    `;
+    const stored = rows[0]?.telegram_chat_id;
+    if (stored) chatId = stored;
+  }
+
+  if (chatId == null) return { sent: false, reason: "no_telegram_chat_id" };
   const text = String(input.text ?? "").slice(0, 500);
-  if (!text) return { sent: false, reason: "empty text" };
+  if (!text) return { sent: false, reason: "empty_text" };
   try {
-    await sendMessage(ctx.chatId, text);
-    return { sent: true, to: ctx.chatId };
+    await sendMessage(chatId, text);
+    return { sent: true, to: chatId };
   } catch (err) {
     return { sent: false, error: err instanceof Error ? err.message : String(err) };
   }

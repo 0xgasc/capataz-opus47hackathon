@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Capataz",
+  title: "CAPA",
   description:
-    "Agente Claude Opus 4.7 para operaciones físicas en Guatemala: construcción y valuación de inventarios, con score auditable.",
+    "Sistema de acciones correctivas y preventivas que vive en tu celular. Claude Opus 4.7 convierte notas de voz, fotos y mensajes en estado real — para cualquier operación que importe.",
 };
 
 export const viewport: Viewport = {
@@ -39,7 +39,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try { var t = localStorage.getItem('capataz-theme') || 'light'; document.documentElement.setAttribute('data-theme', t); } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }`,
+            __html: `try { var t = localStorage.getItem('capa-theme') || 'light'; document.documentElement.setAttribute('data-theme', t); } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }`,
           }}
         />
       </head>
