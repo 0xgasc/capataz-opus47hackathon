@@ -5,7 +5,7 @@
 //
 // Server-side, deterministic, no model call. Cheap and snappy.
 
-type Vertical = "construction" | "inventory" | "tiendita";
+type Vertical = "construction" | "inventory" | "tiendita" | "general";
 
 export type SuggestionContext = {
   vertical: Vertical;
@@ -29,12 +29,18 @@ const VERTICAL_QUERIES: Record<Vertical, string[]> = {
     "¿qué se vendió hoy?",
     "¿qué tareas me toca cerrar?",
   ],
+  general: [
+    "¿qué tengo pendiente hoy?",
+    "¿qué le toca a quién esta semana?",
+    "¿hay algo que me esté olvidando?",
+  ],
 };
 
 const VERTICAL_VERBS: Record<Vertical, { ingest: string; outflow?: string }> = {
   construction: { ingest: "llegaron" },
   inventory:    { ingest: "entró", outflow: "salió" },
   tiendita:     { ingest: "compré", outflow: "vendí" },
+  general:      { ingest: "anotá esto:" },
 };
 
 function pickFirst<T>(arr: T[]): T | undefined {

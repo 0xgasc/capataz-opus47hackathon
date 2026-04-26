@@ -1,12 +1,16 @@
 import Link from "next/link";
 
-type Mode = "construction" | "inventory" | "tiendita";
+type Mode = "construction" | "inventory" | "tiendita" | "general";
 
 const ITEMS: Array<{ mode: Mode; label: string; sub: string }> = [
   { mode: "construction", label: "Construcción", sub: "Ops" },
   { mode: "inventory",    label: "Inventario",   sub: "Valuation" },
   { mode: "tiendita",     label: "Tiendita",     sub: "SMB" },
 ];
+
+// 'general' isn't shown in the switcher (each general business is unique to its
+// owner — no "first general project" pivot makes sense). Users reach general
+// dashboards via their slug or from the landing list.
 
 export function ModeSwitcher({ current }: { current: Mode }) {
   return (

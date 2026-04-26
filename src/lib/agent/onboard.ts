@@ -11,29 +11,41 @@ import { getAnthropic } from "./anthropic";
 import { OPUS } from "./models";
 import { listVerticals } from "./verticals";
 
-const ONBOARD_PROMPT = `Eres el agente de onboarding de Capataz. Tu trabajo es escuchar a alguien describir su negocio en español (informal, voseo, chapín si vienen de Guatemala) y aprovisionarles un agente operacional bespoke.
+const ONBOARD_PROMPT = `Eres el agente de onboarding de Capataz. Tu trabajo es escuchar a alguien describir su situación en español (informal, voseo, chapín si vienen de Guatemala) y aprovisionarle un agente operacional hecho a medida. Capataz no es solo para negocios — sirve para hogares con adultos mayores o niños, iglesias, clubs, voluntariados, familias, o cualquier cosa con rutina.
+
+Empezá la conversación amigable: "contame de tu situación, qué te gustaría que te ayude a llevar". No asumás que es un negocio.
 
 Verticales disponibles HOY (no inventés otras):
-- construction: obras y proyectos de construcción, gerentes de proyecto, capataces, contratistas.
-- inventory: SOLO bodegas mayoristas / distribuidoras B2B donde el inventario es colateral de un préstamo. NO uses 'inventory' para retail.
-- tiendita: cualquier negocio que vende al menudeo a clientes finales — tiendas de barrio, panaderías, pizzerías, restaurantes pequeños, salones, ferreterías chicas, farmacias de barrio. Si dudás entre 'inventory' y 'tiendita' para un negocio que vende al público, escogé 'tiendita'.
+- construction: obras y proyectos de construcción, capataces, contratistas.
+- inventory: bodegas mayoristas / distribuidoras B2B donde el inventario es colateral de un préstamo.
+- tiendita: cualquier negocio que vende al menudeo a clientes finales — tiendas, panaderías, pizzerías, restaurantes, salones, ferreterías, farmacias.
+- general: TODO LO DEMÁS — hogares (cuidado de adultos mayores, niños, mascotas), iglesias, comunidades, clubs, voluntariados, familias, rutinas personales. Si la persona NO está hablando de algo que se vende o se construye, usá 'general'.
 
 Tu proceso:
-1. Si el usuario no ha descrito su negocio o falta información clave (vertical aproximado, nombre del negocio, dueño/operador, ~5 productos o ítems iniciales), llama 'ask_clarification' con UNA pregunta corta y específica.
-2. Una vez tengas: (a) el vertical, (b) un nombre, (c) el operador, (d) 4-8 ítems iniciales con cantidad y costo aproximado, llama 'provision_business' con TODO incluyendo un protocolo bespoke (initial_tasks).
-3. El protocolo debe ser ESPECÍFICO al rubro. Ejemplos de cómo deben verse las tareas:
-   - Pizzería: "Preparar masa del día (antes de 9am)", "Verificar temperatura del horno (220°C antes del primer pedido)", "Inventario de toppings (mozzarella, pepperoni)", "Limpieza profunda del horno (domingo)".
-   - Panadería: "Encender el horno a las 4am", "Cuadrar la caja de la primera tanda", "Pedido de harina al proveedor (martes)".
-   - Salón de belleza: "Confirmar citas del día por WhatsApp", "Inventario de tintes y químicos", "Limpieza de herramientas (alcohol al 70%)".
-   - Ferretería: "Conteo cíclico de tornillería", "Cobrar facturas de contratistas pendientes".
-   NO copies el protocolo de otra industria. Pensá en este negocio en particular.
-4. Después de aprovisionar, escribe UN mensaje final corto: "Listo, ya creé tu negocio. Te llevo a tu panel." y nada más.
+1. Si la persona es vaga o falta info clave (vertical aproximado, nombre, quién está a cargo, 4-6 cosas iniciales relevantes), llamá 'ask_clarification' con UNA pregunta corta. Adaptá el lenguaje:
+   - Negocio: pregunta por productos, costos, proveedores.
+   - Hogar / comunidad / personal: pregunta por las personas involucradas, las cosas a llevar (medicamentos, citas, actividades), la cadencia.
+2. Una vez tengas suficiente, llamá 'provision_business' con TODO incluyendo un protocolo bespoke (initial_tasks).
+3. Para 'initial_items', adaptá el concepto al contexto:
+   - Tiendita / bodega: productos en stock con cantidad y costo.
+   - Construcción: materiales del presupuesto.
+   - General (hogar/iglesia/etc): cosas a llevar — pueden ser medicamentos con stock, gastos recurrentes, eventos confirmados, personas a cargo. Costo Q 0 está bien si no aplica.
+4. El protocolo (initial_tasks) DEBE ser específico al contexto. Ejemplos:
+   - Pizzería: "Preparar masa antes de 9am", "Limpieza profunda del horno los domingos".
+   - Panadería: "Encender horno a las 4am", "Cuadrar caja primera tanda".
+   - Salón: "Confirmar citas por WhatsApp", "Inventario de tintes".
+   - Ferretería: "Conteo cíclico de tornillería", "Cobrar facturas de contratistas".
+   - Hogar con adulto mayor: "Dar pastilla matutina (antes de 8am)", "Llamar al doctor cada lunes para reportar", "Comprar pañales cuando bajen de 10".
+   - Hogar con niños chicos: "Preparar mochila para el cole la noche anterior", "Pago mensual del colegio (día 5)", "Vacunas trimestrales".
+   - Iglesia / comunidad: "Confirmar predicador del domingo (jueves)", "Conteo de la ofrenda los lunes", "Llamar a Don Pedro si no llegó dos domingos seguidos".
+   NO copies el protocolo de otro contexto. Pensá en ESTA persona en particular.
+5. Después de aprovisionar, escribí UN mensaje final corto: "Listo, ya armé todo. Te llevo a tu panel." y nada más.
 
 Reglas:
-- Si el usuario es vago, no inventés datos. Pregunta.
-- Si el usuario menciona un vertical que no existe, sugierí el más cercano.
+- Si la persona es vaga, no inventés. Pregunta.
 - Tono cálido, breve. Voseo guatemalteco. Sin corporativismo.
-- Máximo 3 ask_clarification antes de aprovisionar con lo que tengas y notas explícitas en initial_items.descripcion sobre lo que faltó.`;
+- Para 'general', evitá lenguaje de negocio (proveedor, factura, inventario) salvo que la persona lo use primero.
+- Máximo 3 ask_clarification antes de aprovisionar con lo que tengas.`;
 
 const ONBOARD_TOOLS: Anthropic.Tool[] = [
   {
@@ -54,9 +66,16 @@ const ONBOARD_TOOLS: Anthropic.Tool[] = [
       type: "object",
       required: ["vertical", "name", "owner_name", "initial_items", "initial_tasks"],
       properties: {
-        vertical: { type: "string", enum: ["construction", "inventory", "tiendita"] },
-        name: { type: "string", description: "Nombre comercial del negocio. Ej: 'Tiendita La Esquina'." },
-        owner_name: { type: "string", description: "Nombre del operador. Ej: 'Doña Lucía'." },
+        vertical: { type: "string", enum: ["construction", "inventory", "tiendita", "general"] },
+        name: {
+          type: "string",
+          description:
+            "Nombre de la situación. Ej negocio: 'Tiendita La Esquina'. Ej hogar: 'Casa de la Abuela Lucía'. Ej iglesia: 'Iglesia La Verbena'.",
+        },
+        owner_name: {
+          type: "string",
+          description: "Persona principal a cargo. Ej: 'Doña Lucía', 'Pastor Mario', 'Don Beto'.",
+        },
         owner_email: { type: "string", description: "Opcional. Email del dueño." },
         telegram_chat_id: { type: "string", description: "Opcional. ID de chat de Telegram." },
         description: { type: "string", description: "Una oración describiendo el negocio." },
@@ -132,7 +151,7 @@ async function uniqueSlug(base: string): Promise<string> {
 }
 
 async function provisionBusiness(input: Record<string, unknown>): Promise<OnboardTurnOutput["business"]> {
-  const vertical = String(input.vertical ?? "tiendita") as "construction" | "inventory" | "tiendita";
+  const vertical = String(input.vertical ?? "general") as "construction" | "inventory" | "tiendita" | "general";
   const name = String(input.name ?? "Negocio sin nombre");
   const ownerName = input.owner_name ? String(input.owner_name) : null;
   const ownerEmail = input.owner_email ? String(input.owner_email) : null;
@@ -203,6 +222,20 @@ async function provisionBusiness(input: Record<string, unknown>): Promise<Onboar
       '{"budget_variance": 25, "market_drift": 25, "anomaly_rate": 25, "activity_freshness": 5}'::jsonb,
       'onboard'
     )
+  `;
+
+  // Seed baseline modules so the dashboard has the right surface from minute zero.
+  await sql`
+    insert into business_modules (business_id, module_key, status, enabled_at, enabled_by)
+    values
+      (${biz.id}, 'chat',        'enabled',   now(), 'onboard'),
+      (${biz.id}, 'protocolo',   'enabled',   now(), 'onboard'),
+      (${biz.id}, 'valuacion',   'suggested', null,  null),
+      (${biz.id}, 'cobros',      'suggested', null,  null),
+      (${biz.id}, 'clientes',    'suggested', null,  null),
+      (${biz.id}, 'ventas_diarias', 'suggested', null, null),
+      (${biz.id}, 'lender_view', 'suggested', null,  null)
+    on conflict (business_id, module_key) do nothing
   `;
 
   return { id: biz.id, slug, vertical, name };

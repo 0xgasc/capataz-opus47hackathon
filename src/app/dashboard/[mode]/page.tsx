@@ -18,7 +18,7 @@ import { ThemeToggle } from "../../theme-toggle";
 
 export const dynamic = "force-dynamic";
 
-type Mode = "construction" | "inventory" | "tiendita";
+type Mode = "construction" | "inventory" | "tiendita" | "general";
 
 const MODE_COPY: Record<Mode, { label: string; greeting: string; emptyEvents: string }> = {
   construction: {
@@ -35,6 +35,11 @@ const MODE_COPY: Record<Mode, { label: string; greeting: string; emptyEvents: st
     label: "Tiendita",
     greeting: "Tu tiendita, en chat",
     emptyEvents: "Mandale un mensaje a Capataz para empezar el día.",
+  },
+  general: {
+    label: "Rutina",
+    greeting: "Tu día a día, en chat",
+    emptyEvents: "Contale a Capataz qué pasó hoy. Lo que sea — Capataz lo organiza.",
   },
 };
 
