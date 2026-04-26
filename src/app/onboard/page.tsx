@@ -13,11 +13,11 @@ export default function OnboardPage() {
             Capataz · onboarding
           </p>
           <h1 className="text-2xl sm:text-3xl font-semibold leading-tight">
-            Contame de tu negocio.
+            Contame de tu situación.
           </h1>
           <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-            En menos de un minuto, Opus 4.7 aprovisiona tu agente, te crea un panel y te
-            lleva ahí. Hablale como le hablarías a un amigo: voseo, chapín, suelto.
+            Un negocio, un hogar, un encargo, una rutina — lo que sea que necesités llevar.
+            Opus 4.7 te arma un agente a medida y te lleva a tu panel. Hablale suelto.
           </p>
         </header>
         <OnboardChat />
